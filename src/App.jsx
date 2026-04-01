@@ -8,10 +8,20 @@ const DAYS_RU = {
   thursday: 'Четверг',
   friday: 'Пятница'
 }
+
+const COMPANY_TYPES = [
+  { id: 'office', name: 'Офис', desc: 'Ежедневный выбор', emoji: '🏢' },
+  { id: 'plant', name: 'Производство', desc: 'Недельное меню', emoji: '🏭' },
+  { id: 'quarter', name: 'Квартал', desc: 'Меню на квартал', emoji: '📅' }
+]
+
 const FOOD_TYPES = [
   { id: 'regular', name: 'Обычное', emoji: '🍽️' },
-  { id: 'halal', name: 'Халяль', emoji: '🥩' }
+  { id: 'halal', name: 'Халяль', emoji: '🥩' },
+  { id: 'pp', name: 'ПП', emoji: '🥗' },
+  { id: 'special', name: 'Специальное', emoji: '⭐' }
 ]
+
 const CATEGORIES = {
   soup: 'Супы',
   main: 'Второе',
@@ -83,6 +93,60 @@ const SAMPLE_MENU = {
       { id: 'h19', name: 'Свежий салат', price: 90, category: 'salad' },
       { id: 'h20', name: 'Чай', price: 30, category: 'drink' }
     ]
+  },
+  pp: {
+    monday: [
+      { id: 'pp1', name: 'Суп овощной', price: 100, category: 'soup' },
+      { id: 'pp2', name: 'Курица на пару', price: 180, category: 'main' },
+      { id: 'pp3', name: 'Салат свежий', price: 80, category: 'salad' },
+      { id: 'pp4', name: 'Зелёный чай', price: 30, category: 'drink' }
+    ],
+    tuesday: [
+      { id: 'pp5', name: 'Бульон', price: 80, category: 'soup' },
+      { id: 'pp6', name: 'Рыба на пару', price: 200, category: 'main' },
+      { id: 'pp7', name: 'Овощи гриль', price: 100, category: 'salad' },
+      { id: 'pp8', name: 'Чай травяной', price: 30, category: 'drink' }
+    ],
+    wednesday: [
+      { id: 'pp9', name: 'Суп чечевичный', price: 100, category: 'soup' },
+      { id: 'pp10', name: 'Индейка с овощами', price: 220, category: 'main' },
+      { id: 'pp11', name: 'Салат цезарь лайт', price: 120, category: 'salad' },
+      { id: 'pp12', name: 'Смузи', price: 80, category: 'drink' }
+    ],
+    thursday: [
+      { id: 'pp13', name: 'Гаспачо', price: 100, category: 'soup' },
+      { id: 'pp14', name: 'Телятина на пару', price: 250, category: 'main' },
+      { id: 'pp15', name: 'Салат с киноа', price: 130, category: 'salad' },
+      { id: 'pp16', name: 'Морс', price: 40, category: 'drink' }
+    ],
+    friday: [
+      { id: 'pp17', name: 'Суп тыквенный', price: 100, category: 'soup' },
+      { id: 'pp18', name: 'Лосось с салатом', price: 280, category: 'main' },
+      { id: 'pp19', name: 'Салат греческий лайт', price: 110, category: 'salad' },
+      { id: 'pp20', name: 'Чай', price: 30, category: 'drink' }
+    ]
+  },
+  special: {
+    monday: [
+      { id: 's1', name: 'Безглютеновый суп', price: 150, category: 'soup' },
+      { id: 's2', name: 'Диетическое блюдо', price: 200, category: 'main' }
+    ],
+    tuesday: [
+      { id: 's3', name: 'Вегетарианский суп', price: 130, category: 'soup' },
+      { id: 's4', name: 'Блюдо без лактозы', price: 220, category: 'main' }
+    ],
+    wednesday: [
+      { id: 's5', name: 'Низкокалорийный суп', price: 120, category: 'soup' },
+      { id: 's6', name: 'Блюдо для диабетиков', price: 210, category: 'main' }
+    ],
+    thursday: [
+      { id: 's7', name: 'Суп без глютена', price: 140, category: 'soup' },
+      { id: 's8', name: 'Гипоаллергенное блюдо', price: 230, category: 'main' }
+    ],
+    friday: [
+      { id: 's9', name: 'Лечебный суп', price: 150, category: 'soup' },
+      { id: 's10', name: 'Специальное блюдо', price: 250, category: 'main' }
+    ]
   }
 }
 
@@ -103,8 +167,18 @@ const labelStyle = {
   fontSize: 14
 }
 
+const numberInputStyle = {
+  width: '80px',
+  padding: '8px',
+  fontSize: 16,
+  borderRadius: 8,
+  border: '2px solid #ddd',
+  textAlign: 'center'
+}
+
 function App() {
-  const [step, setStep] = useState(1) // 1: клиент, 2: меню
+  const [step, setStep] = useState(1) // 1: компания, 2: сотрудники, 3: меню
+  const [companyType, setCompanyType] = useState('office')
   const [foodType, setFoodType] = useState('regular')
   const [day, setDay] = useState('monday')
   const [selectedDishes, setSelectedDishes] = useState([])
@@ -118,6 +192,16 @@ function App() {
     email: '',
     address: ''
   })
+
+  // Количество сотрудников
+  const [staff, setStaff] = useState({
+    regular: 0,
+    halal: 0,
+    pp: 0,
+    special: 0
+  })
+
+  const totalStaff = staff.regular + staff.halal + staff.pp + staff.special
 
   const menu = SAMPLE_MENU[foodType][day] || []
   const total = selectedDishes.reduce((sum, d) => sum + d.price, 0)
@@ -140,10 +224,17 @@ function App() {
     return acc
   }, {})
 
-  const handleClientSubmit = (e) => {
+  const handleCompanySubmit = (e) => {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
       setStep(2)
+    }
+  }
+
+  const handleStaffSubmit = (e) => {
+    e.preventDefault()
+    if (totalStaff > 0) {
+      setStep(3)
     }
   }
 
@@ -152,11 +243,11 @@ function App() {
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>🍽️ Питание СПБ</h1>
       <p style={{ color: '#666', marginTop: 0 }}>Система заказа питания</p>
 
-      {/* ШАГ 1: Карточка клиента */}
+      {/* ШАГ 1: Карточка клиента + тип предприятия */}
       {step === 1 && (
         <div style={{ background: '#f5f5f5', padding: 16, borderRadius: 12, marginTop: 16 }}>
           <h2 style={{ marginTop: 0 }}>📋 Данные компании</h2>
-          <form onSubmit={handleClientSubmit}>
+          <form onSubmit={handleCompanySubmit}>
             <label style={labelStyle}>Название компании *</label>
             <input
               type="text"
@@ -205,6 +296,30 @@ function App() {
               style={inputStyle}
             />
 
+            <label style={labelStyle}>Тип предприятия:</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {COMPANY_TYPES.map(type => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => setCompanyType(type.id)}
+                  style={{
+                    padding: '12px 16px',
+                    border: companyType === type.id ? '2px solid #2196F3' : '2px solid #ddd',
+                    borderRadius: 8,
+                    background: companyType === type.id ? '#E3F2FD' : '#fff',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: 16
+                  }}
+                >
+                  <span style={{ fontSize: 20, marginRight: 8 }}>{type.emoji}</span>
+                  <b>{type.name}</b>
+                  <span style={{ color: '#666', fontSize: 14, marginLeft: 8 }}>- {type.desc}</span>
+                </button>
+              ))}
+            </div>
+
             <button type="submit" style={{
               width: '100%',
               background: '#2196F3',
@@ -223,46 +338,114 @@ function App() {
         </div>
       )}
 
-      {/* ШАГ 2: Выбор меню */}
+      {/* ШАГ 2: Количество сотрудников */}
       {step === 2 && (
+        <div style={{ background: '#f5f5f5', padding: 16, borderRadius: 12, marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>👥 Сотрудники на сегодня</h2>
+          
+          <div style={{ marginBottom: 16, padding: 12, background: '#E8F5E9', borderRadius: 8 }}>
+            <div style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center' }}>
+              Всего: {totalStaff} чел.
+            </div>
+          </div>
+
+          <form onSubmit={handleStaffSubmit}>
+            {FOOD_TYPES.map(type => (
+              <div key={type.id} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                padding: '12px',
+                background: '#fff',
+                borderRadius: 8,
+                marginBottom: 8
+              }}>
+                <span>
+                  <span style={{ fontSize: 18, marginRight: 8 }}>{type.emoji}</span>
+                  <b>{type.name}</b>
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  value={staff[type.id]}
+                  onChange={(e) => setStaff({...staff, [type.id]: parseInt(e.target.value) || 0})}
+                  style={numberInputStyle}
+                />
+              </div>
+            ))}
+
+            <button type="submit" disabled={totalStaff === 0} style={{
+              width: '100%',
+              background: totalStaff > 0 ? '#4CAF50' : '#ccc',
+              color: '#fff',
+              border: 'none',
+              padding: '14px',
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 'bold',
+              cursor: totalStaff > 0 ? 'pointer' : 'not-allowed',
+              marginTop: 8
+            }}>
+              Продолжить →
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => setStep(1)}
+              style={{
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                color: '#666',
+                padding: '12px',
+                cursor: 'pointer',
+                marginTop: 8
+              }}
+            >
+              ← Назад
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ШАГ 3: Выбор меню */}
+      {step === 3 && (
         <>
           <div style={{ 
             background: '#E3F2FD', 
             padding: 12, 
             borderRadius: 8, 
-            marginBottom: 16,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            marginBottom: 16
           }}>
-            <div>
-              <div style={{ fontWeight: 'bold' }}>{client.company}</div>
-              <div style={{ fontSize: 14, color: '#666' }}>{client.contact} • {client.phone}</div>
+            <div style={{ fontWeight: 'bold' }}>{client.company}</div>
+            <div style={{ fontSize: 14, color: '#666' }}>{client.contact} • {client.phone}</div>
+            <div style={{ fontSize: 14, marginTop: 4 }}>
+              <b>Тип:</b> {COMPANY_TYPES.find(c => c.id === companyType)?.name}
+              <span style={{ marginLeft: 12 }}><b>Сотрудников:</b> {totalStaff}</span>
             </div>
-            <button 
-              onClick={() => setStep(1)}
-              style={{ background: 'none', border: 'none', color: '#2196F3', cursor: 'pointer', fontSize: 14 }}
-            >
-              Изменить
-            </button>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              {staff.regular > 0 && <span>🍽️ {staff.regular}</span>}
+              {staff.halal > 0 && <span style={{ marginLeft: 8 }}>🥩 {staff.halal}</span>}
+              {staff.pp > 0 && <span style={{ marginLeft: 8 }}>🥗 {staff.pp}</span>}
+              {staff.special > 0 && <span style={{ marginLeft: 8 }}>⭐ {staff.special}</span>}
+            </div>
           </div>
 
           {/* Выбор типа питания */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 8 }}>Тип питания:</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {FOOD_TYPES.map(type => (
                 <button
                   key={type.id}
                   onClick={() => { setFoodType(type.id); setSelectedDishes([]) }}
                   style={{
-                    flex: 1,
-                    padding: '12px 16px',
+                    padding: '10px 14px',
                     border: foodType === type.id ? '2px solid #2196F3' : '2px solid #ddd',
                     borderRadius: 8,
                     background: foodType === type.id ? '#E3F2FD' : '#fff',
                     cursor: 'pointer',
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: 'bold'
                   }}
                 >
