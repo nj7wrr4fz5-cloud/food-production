@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 
 const COMPANY_TYPES = [
-  { id: 'office', name: 'Офис', desc: 'Ежедневный выбор блюд', emoji: '🏢' },
-  { id: 'plant', name: 'Производство', desc: 'Недельное меню', emoji: '🏭' },
-  { id: 'quarter', name: 'Квартал', desc: 'Меню на квартал', emoji: '📅' }
+  { id: 'office', name: 'Офис', emoji: '🏢' },
+  { id: 'plant', name: 'Производство', emoji: '🏭' },
+  { id: 'quarter', name: 'Квартал', emoji: '📅' }
 ]
 
 const CLIENTS_DB = {
@@ -22,13 +22,11 @@ const CLIENTS_DB = {
     active: true,
     featured: true,
     discount: 10,
-    discountType: 'annual',
     staff: { regular: 45, halal: 12, pp: 8, director: 3 },
     meals: ['breakfast', 'lunch', 'dinner'],
     deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
     manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-    adminComment: '',
-    commentDate: null
+    adminComment: ''
   },
   'TEST-002': {
     id: 'TEST-002',
@@ -36,7 +34,6 @@ const CLIENTS_DB = {
     inn: '7823456789',
     contact: 'Сидоров Алексей',
     phone: '+7 (999) 987-65-43',
-    email: 'sidorov@ip.ru',
     address: 'г. Санкт-Петербург, пр. Ленина, д. 5',
     companyType: 'plant',
     contractDate: '2025-02-01',
@@ -45,26 +42,30 @@ const CLIENTS_DB = {
     active: true,
     featured: false,
     discount: 5,
-    discountType: 'annual',
     staff: { regular: 20, halal: 5, pp: 0, director: 1 },
     meals: ['lunch', 'dinner'],
-    deliveryTime: { breakfast: '', lunch: '12:00-13:00', dinner: '17:30-18:30' },
+    deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
     manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-    adminComment: 'VIP клиент',
-    commentDate: '2025-03-15'
+    adminComment: 'VIP клиент'
   }
 }
 
-const ORDER_HISTORY = [
-  { date: '2026-03-31', day: 'monday', meals: { breakfast: 45, lunch: 68, dinner: 45 }, total: 85400, staff: 68 },
-  { date: '2026-03-28', day: 'friday', meals: { breakfast: 44, lunch: 66, dinner: 44 }, total: 83120, staff: 66 },
-]
+// ID тем из Telegram
+const THREADS = {
+  history: '360',      // История - лог изменений
+  waiting: '362',      // Ожидание - заказы на согласование
+  newUser: '361',      // Новый пользователь
+  orders: '359'        // Заявки
+}
+
+const BOT_TOKEN = '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y'
+const CHAT_ID = '-1002583331823'
 
 const PRICES = {
-  regular: { breakfast: 280, lunch: 420, dinner: 380, night: 420 },
-  halal: { breakfast: 320, lunch: 480, dinner: 440, night: 480 },
-  pp: { breakfast: 350, lunch: 520, dinner: 460, night: 520 },
-  director: { breakfast: 420, lunch: 620, dinner: 560, night: 620 }
+  regular: { breakfast: 280, lunch: 420, dinner: 380 },
+  halal: { breakfast: 320, lunch: 480, dinner: 440 },
+  pp: { breakfast: 350, lunch: 520, dinner: 460 },
+  director: { breakfast: 420, lunch: 620, dinner: 560 }
 }
 
 const FOOD_TYPES = [
@@ -77,8 +78,7 @@ const FOOD_TYPES = [
 const MEALS = [
   { id: 'breakfast', name: 'Завтрак', emoji: '🥐' },
   { id: 'lunch', name: 'Обед', emoji: '🍱' },
-  { id: 'dinner', name: 'Ужин', emoji: '🍽️' },
-  { id: 'night', name: 'Ночной', emoji: '🌙' }
+  { id: 'dinner', name: 'Ужин', emoji: '🍽️' }
 ]
 
 const PAYMENT_METHODS = [
@@ -117,6 +117,24 @@ const buttonPrimaryStyle = {
   padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer'
 }
 
+// Отправка в Telegram с указанием темы
+const sendToTelegram = async (message, threadId) => {
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: message,
+        parse_mode: 'Markdown',
+        message_thread_id: threadId
+      })
+    })
+  } catch (err) {
+    console.log('Telegram error:', err)
+  }
+}
+
 function App() {
   const [view, setView] = useState('login')
   const [tab, setTab] = useState('clients')
@@ -136,14 +154,16 @@ function App() {
     paymentMethod: 'card', paymentPeriod: 'monthly'
   })
 
-  // Hash роутинг
+  // Заказы
+  const [orders, setOrders] = useState([
+    { id: 1, clientId: 'TEST-001', date: '2026-04-02', day: 'tuesday', meals: { breakfast: 45, lunch: 68, dinner: 45 }, status: 'waiting', total: 85400 },
+    { id: 2, clientId: 'TEST-001', date: '2026-04-03', day: 'wednesday', meals: { breakfast: 44, lunch: 67, dinner: 44 }, status: 'waiting', total: 83120 },
+  ])
+
   useEffect(() => {
     const hash = window.location.hash.slice(1)
-    if (hash === 'admin') {
-      setView('admin')
-    } else if (hash === 'new') {
-      setView('new-user')
-    }
+    if (hash === 'admin') setView('admin')
+    else if (hash === 'new') setView('new-user')
   }, [])
 
   const navigate = (page) => {
@@ -185,13 +205,7 @@ function App() {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
       const message = `📋 *Новая заявка!*\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}`
-      try {
-        await fetch(`https://api.telegram.org/bot6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: '-1002583331823', text: message, parse_mode: 'Markdown' })
-        })
-      } catch (err) {}
+      await sendToTelegram(message, THREADS.orders)
       alert('Заявка отправлена!')
       navigate('login')
     }
@@ -200,32 +214,77 @@ function App() {
   const handleSendComment = async () => {
     if (comment.trim() && currentClient) {
       const message = `💬 *${currentClient.company}:*\n${comment}`
-      try {
-        await fetch(`https://api.telegram.org/bot6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: '-1002583331823', text: message, parse_mode: 'Markdown' })
-        })
-      } catch (err) {}
+      await sendToTelegram(message, THREADS.history)
       alert('Отправлено!')
       setComment('')
       setCommentSent(true)
     }
   }
 
-  const saveClientEdit = () => {
+  // Сохранение изменений клиента с отправкой в историю
+  const saveClientEdit = async () => {
     if (editingClient) {
+      const oldClient = clients[editingClient.id]
+      const changes = []
+
+      // Собираем изменения
+      if (oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
+      if (oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
+      if (oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
+      if (oldClient.paymentMethod !== editingClient.paymentMethod) changes.push(`оплата: ${oldClient.paymentMethod} → ${editingClient.paymentMethod}`)
+      if (oldClient.paymentPeriod !== editingClient.paymentPeriod) changes.push(`период: ${oldClient.paymentPeriod} → ${editingClient.paymentPeriod}`)
+      if (oldClient.address !== editingClient.address) changes.push(`адрес: ${oldClient.address} → ${editingClient.address}`)
+      if (oldClient.manager?.name !== editingClient.manager?.name) changes.push(`менеджер: ${oldClient.manager?.name} → ${editingClient.manager?.name}`)
+      if (oldClient.adminComment !== editingClient.adminComment) changes.push(`комментарий: "${editingClient.adminComment}"`)
+
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
+
+      // Отправляем лог в историю
+      if (changes.length > 0) {
+        const logMessage = `📝 *Изменение: ${editingClient.company}*\n\n${changes.join('\n')}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
+        await sendToTelegram(logMessage, THREADS.history)
+      }
+
       setEditingClient(null)
       alert('Сохранено!')
     }
+  }
+
+  // Создание заказа
+  const createOrder = async () => {
+    const newOrder = {
+      id: Date.now(),
+      clientId: currentClient.id,
+      date: new Date().toISOString().split('T')[0],
+      day: selectedDay,
+      meals: { breakfast: 0, lunch: 0, dinner: 0 },
+      status: 'waiting',
+      total: 0
+    }
+
+    // Добавляем выбранные приёмы
+    selectedMeals.forEach(m => {
+      newOrder.meals[m] = currentClient.staff?.regular || 0
+    })
+
+    // Считаем стоимость
+    const pricePerMeal = PRICES.regular.lunch
+    newOrder.total = (newOrder.meals.breakfast + newOrder.meals.lunch + newOrder.meals.dinner) * pricePerMeal
+
+    setOrders(prev => [...prev, newOrder])
+
+    // Отправляем в ожидание
+    const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n*Завтрак:* ${newOrder.meals.breakfast}\n*Обед:* ${newOrder.meals.lunch}\n*Ужин:* ${newOrder.meals.dinner}\n\n*Стоимость:* ${newOrder.total.toLocaleString()}₽`
+    await sendToTelegram(orderMessage, THREADS.waiting)
+
+    alert('Заказ отправлен на согласование!')
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
   const getPaymentMethodName = (id) => PAYMENT_METHODS.find(p => p.id === id)?.name || id
   const getPaymentPeriodName = (id) => PAYMENT_PERIODS.find(p => p.id === id)?.name || id
 
-  const todayOrders = ORDER_HISTORY[0]
+  const todayOrders = orders.filter(o => o.status === 'waiting')
 
   // === ВХОД ===
   if (!currentClient && view !== 'admin') {
@@ -298,7 +357,7 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }}>
-          {[{ id: 'clients', name: '🏢 Клиенты' }, { id: 'orders', name: '📋 Заявки' }].map(t => (
+          {[{ id: 'clients', name: '🏢 Клиенты' }, { id: 'orders', name: '📋 Заказы' }, { id: 'waiting', name: '📥 Ожидание' }].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{
                 padding: '10px 14px', border: 'none', borderRadius: 8,
@@ -341,12 +400,53 @@ function App() {
 
         {tab === 'orders' && (
           <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0 }}>Заявки</h3>
-            <div style={{ padding: 12, background: '#fafafa', borderRadius: 8 }}>
-              <div style={{ fontWeight: '600' }}>ООО Ромашка</div>
-              <div style={{ fontSize: 13, color: '#666' }}>Иванов • +7(999)111-22-33</div>
-              <span style={{ padding: '4px 12px', background: '#FFF3E0', borderRadius: 16, fontSize: 12 }}>Новая</span>
-            </div>
+            <h3 style={{ marginTop: 0 }}>Все заказы</h3>
+            {orders.map(order => {
+              const clientName = clients[order.clientId]?.company || 'Unknown'
+              return (
+                <div key={order.id} style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '600' }}>{clientName}</div>
+                    <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.total.toLocaleString()}₽</div>
+                  </div>
+                  <span style={{ padding: '4px 12px', background: order.status === 'waiting' ? '#FFF3E0' : '#E8F5E9', borderRadius: 16, fontSize: 12 }}>
+                    {order.status === 'waiting' ? '⏳ Ожидание' : '✓ Подтверждён'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'waiting' && (
+          <div style={sectionStyle}>
+            <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования</h3>
+            {orders.filter(o => o.status === 'waiting').map(order => {
+              const clientName = clients[order.clientId]?.company || 'Unknown'
+              return (
+                <div key={order.id} style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600' }}>{clientName}</div>
+                      <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]}, {order.date}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 'bold', color: '#FF9800' }}>{order.total.toLocaleString()}₽</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        завтрак: {order.meals. breakfast} • обед: {order.meals.lunch} • ужин: {order.meals.dinner}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button onClick={() => setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
+                    <button onClick={() => setOrders(prev => prev.filter(o => o.id !== order.id))} style={{ flex: 1, padding: '8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✕ Отклонить</button>
+                  </div>
+                </div>
+              )
+            })}
+            {orders.filter(o => o.status === 'waiting').length === 0 && (
+              <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Нет заказов на согласование</div>
+            )}
           </div>
         )}
 
@@ -409,7 +509,7 @@ function App() {
               </div>
 
               <label style={labelStyle}>Комментарий клиенту:</label>
-              <textarea value={editingClient.adminComment || ''} onChange={(e) => setEditingClient({...editingClient, adminComment: e.target.value, commentDate: new Date().toISOString().split('T')[0]})} style={{ ...inputStyle, height: 80 }} />
+              <textarea value={editingClient.adminComment || ''} onChange={(e) => setEditingClient({...editingClient, adminComment: e.target.value})} style={{ ...inputStyle, height: 80 }} />
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <button onClick={saveClientEdit} style={{ ...buttonPrimaryStyle, background: '#4CAF50' }}>Сохранить</button>
@@ -464,12 +564,12 @@ function App() {
           <div style={sectionStyle}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ padding: 14, background: '#E3F2FD', borderRadius: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1976D2' }}>{todayOrders?.staff || 0}</div>
-                <div style={{ fontSize: 12, color: '#666' }}>человек</div>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1976D2' }}>{todayOrders.length}</div>
+                <div style={{ fontSize: 12, color: '#666' }}>ожидают</div>
               </div>
               <div style={{ padding: 14, background: '#E8F5E9', borderRadius: 10, textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#4CAF50' }}>{(todayOrders?.total || 0).toLocaleString()}₽</div>
-                <div style={{ fontSize: 12, color: '#666' }}>стоимость</div>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#4CAF50' }}>{todayOrders.reduce((s,o) => s+o.total, 0).toLocaleString()}₽</div>
+                <div style={{ fontSize: 12, color: '#666' }}>сумма</div>
               </div>
             </div>
           </div>
@@ -513,12 +613,25 @@ function App() {
 
       {tab === 'orders' && (
         <div style={sectionStyle}>
-          {ORDER_HISTORY.map((order, i) => (
-            <div key={i} style={{ padding: 10, background: '#fafafa', borderRadius: 6, marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ fontWeight: '600', fontSize: 14 }}>{DAYS_RU[order.day]}</div>
-              <div style={{ color: '#4CAF50', fontWeight: '600' }}>{order.total.toLocaleString()}₽</div>
-            </div>
-          ))}
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>📋 Сделать заказ</h3>
+          <label style={labelStyle}>День недели:</label>
+          <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} style={{...inputStyle, marginBottom: 12}}>
+            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map(d => <option key={d} value={d}>{DAYS_RU[d]}</option>)}
+          </select>
+
+          <label style={labelStyle}>Приёмы пищи:</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {MEALS.map(m => (
+              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={selectedMeals.includes(m.id)} onChange={() => toggleMeal(m.id)} />
+                {m.emoji} {m.name}
+              </label>
+            ))}
+          </div>
+
+          <button onClick={createOrder} disabled={selectedMeals.length === 0} style={{ ...buttonPrimaryStyle, background: selectedMeals.length > 0 ? '#4CAF50' : '#ccc' }}>
+            📤 Отправить на согласование
+          </button>
         </div>
       )}
 
