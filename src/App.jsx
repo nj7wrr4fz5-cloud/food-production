@@ -86,11 +86,38 @@ const SAMPLE_MENU = {
   }
 }
 
+const inputStyle = {
+  width: '100%',
+  padding: '12px',
+  fontSize: 16,
+  borderRadius: 8,
+  border: '2px solid #ddd',
+  marginBottom: 12,
+  boxSizing: 'border-box'
+}
+
+const labelStyle = {
+  fontWeight: 'bold',
+  display: 'block',
+  marginBottom: 8,
+  fontSize: 14
+}
+
 function App() {
+  const [step, setStep] = useState(1) // 1: клиент, 2: меню
   const [foodType, setFoodType] = useState('regular')
   const [day, setDay] = useState('monday')
   const [selectedDishes, setSelectedDishes] = useState([])
-  const [loading] = useState(false)
+  const [mixedStaff, setMixedStaff] = useState(false)
+  
+  // Данные клиента
+  const [client, setClient] = useState({
+    company: '',
+    contact: '',
+    phone: '',
+    email: '',
+    address: ''
+  })
 
   const menu = SAMPLE_MENU[foodType][day] || []
   const total = selectedDishes.reduce((sum, d) => sum + d.price, 0)
@@ -113,61 +140,174 @@ function App() {
     return acc
   }, {})
 
+  const handleClientSubmit = (e) => {
+    e.preventDefault()
+    if (client.company && client.contact && client.phone) {
+      setStep(2)
+    }
+  }
+
   return (
     <div style={{ padding: 16, maxWidth: 500, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>🍽️ Питание СПБ</h1>
       <p style={{ color: '#666', marginTop: 0 }}>Система заказа питания</p>
 
-      {/* Выбор типа питания */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 8 }}>Тип питания:</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {FOOD_TYPES.map(type => (
-            <button
-              key={type.id}
-              onClick={() => { setFoodType(type.id); setSelectedDishes([]) }}
+      {/* ШАГ 1: Карточка клиента */}
+      {step === 1 && (
+        <div style={{ background: '#f5f5f5', padding: 16, borderRadius: 12, marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>📋 Данные компании</h2>
+          <form onSubmit={handleClientSubmit}>
+            <label style={labelStyle}>Название компании *</label>
+            <input
+              type="text"
+              placeholder="ООО Ромашка"
+              value={client.company}
+              onChange={(e) => setClient({...client, company: e.target.value})}
+              style={inputStyle}
+              required
+            />
+
+            <label style={labelStyle}>Контактное лицо *</label>
+            <input
+              type="text"
+              placeholder="Иван Иванов"
+              value={client.contact}
+              onChange={(e) => setClient({...client, contact: e.target.value})}
+              style={inputStyle}
+              required
+            />
+
+            <label style={labelStyle}>Телефон *</label>
+            <input
+              type="tel"
+              placeholder="+7 (999) 123-45-67"
+              value={client.phone}
+              onChange={(e) => setClient({...client, phone: e.target.value})}
+              style={inputStyle}
+              required
+            />
+
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              placeholder="info@company.ru"
+              value={client.email}
+              onChange={(e) => setClient({...client, email: e.target.value})}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>Адрес доставки</label>
+            <input
+              type="text"
+              placeholder="ул. Примерная, д. 1"
+              value={client.address}
+              onChange={(e) => setClient({...client, address: e.target.value})}
+              style={inputStyle}
+            />
+
+            <button type="submit" style={{
+              width: '100%',
+              background: '#2196F3',
+              color: '#fff',
+              border: 'none',
+              padding: '14px',
+              borderRadius: 8,
+              fontSize: 16,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              marginTop: 8
+            }}>
+              Продолжить →
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ШАГ 2: Выбор меню */}
+      {step === 2 && (
+        <>
+          <div style={{ 
+            background: '#E3F2FD', 
+            padding: 12, 
+            borderRadius: 8, 
+            marginBottom: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{client.company}</div>
+              <div style={{ fontSize: 14, color: '#666' }}>{client.contact} • {client.phone}</div>
+            </div>
+            <button 
+              onClick={() => setStep(1)}
+              style={{ background: 'none', border: 'none', color: '#2196F3', cursor: 'pointer', fontSize: 14 }}
+            >
+              Изменить
+            </button>
+          </div>
+
+          {/* Выбор типа питания */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 8 }}>Тип питания:</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {FOOD_TYPES.map(type => (
+                <button
+                  key={type.id}
+                  onClick={() => { setFoodType(type.id); setSelectedDishes([]) }}
+                  style={{
+                    flex: 1,
+                    padding: '12px 16px',
+                    border: foodType === type.id ? '2px solid #2196F3' : '2px solid #ddd',
+                    borderRadius: 8,
+                    background: foodType === type.id ? '#E3F2FD' : '#fff',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {type.emoji} {type.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Смешанный состав */}
+          {foodType === 'regular' && (
+            <div style={{ marginBottom: 16, background: '#FFF3E0', padding: 12, borderRadius: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={mixedStaff}
+                  onChange={(e) => setMixedStaff(e.target.checked)}
+                  style={{ width: 20, height: 20, marginRight: 10 }}
+                />
+                <span style={{ fontSize: 14 }}>В заказе есть сотрудники, которым нужно <b>без свинины</b></span>
+              </label>
+            </div>
+          )}
+
+          {/* Выбор дня */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 8 }}>День недели:</label>
+            <select
+              value={day}
+              onChange={(e) => { setDay(e.target.value); setSelectedDishes([]) }}
               style={{
-                flex: 1,
-                padding: '12px 16px',
-                border: foodType === type.id ? '2px solid #2196F3' : '2px solid #ddd',
-                borderRadius: 8,
-                background: foodType === type.id ? '#E3F2FD' : '#fff',
-                cursor: 'pointer',
+                width: '100%',
+                padding: '12px',
                 fontSize: 16,
-                fontWeight: 'bold'
+                borderRadius: 8,
+                border: '2px solid #ddd'
               }}
             >
-              {type.emoji} {type.name}
-            </button>
-          ))}
-        </div>
-      </div>
+              {DAYS.map(d => (
+                <option key={d} value={d}>{DAYS_RU[d]}</option>
+              ))}
+            </select>
+          </div>
 
-      {/* Выбор дня */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 8 }}>День недели:</label>
-        <select
-          value={day}
-          onChange={(e) => { setDay(e.target.value); setSelectedDishes([]) }}
-          style={{
-            width: '100%',
-            padding: '12px',
-            fontSize: 16,
-            borderRadius: 8,
-            border: '2px solid #ddd'
-          }}
-        >
-          {DAYS.map(d => (
-            <option key={d} value={d}>{DAYS_RU[d]}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Меню */}
-      {loading ? (
-        <div style={{ padding: 40, textAlign: 'center' }}>Загрузка...</div>
-      ) : (
-        <div>
+          {/* Меню */}
           {Object.entries(groupedMenu).map(([category, dishes]) => (
             <div key={category} style={{ marginBottom: 16 }}>
               <h3 style={{ fontSize: 14, color: '#666', marginBottom: 8, textTransform: 'uppercase' }}>
@@ -198,45 +338,46 @@ function App() {
               </div>
             </div>
           ))}
-        </div>
-      )}
 
-      {/* Корзина */}
-      {selectedDishes.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: '#fff',
-          borderTop: '2px solid #4CAF50',
-          padding: 16,
-          boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ maxWidth: 500, margin: '0 auto' }}>
-            <div style={{ marginBottom: 8, fontSize: 14, color: '#666' }}>
-              Выбрано: {selectedDishes.length} блюд
+          {/* Корзина */}
+          {selectedDishes.length > 0 && (
+            <div style={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: '#fff',
+              borderTop: '2px solid #4CAF50',
+              padding: 16,
+              boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ maxWidth: 500, margin: '0 auto' }}>
+                <div style={{ marginBottom: 8, fontSize: 14, color: '#666' }}>
+                  Выбрано: {selectedDishes.length} блюд
+                  {mixedStaff && <span style={{ color: '#FF9800', marginLeft: 8 }}>⚠️ Без свинины</span>}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 20, fontWeight: 'bold' }}>Итого: {total}₽</span>
+                  <button style={{
+                    background: '#4CAF50',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: 8,
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}>
+                    Заказать →
+                  </button>
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 20, fontWeight: 'bold' }}>Итого: {total}₽</span>
-              <button style={{
-                background: '#4CAF50',
-                color: '#fff',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: 8,
-                fontSize: 16,
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}>
-                Заказать →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      <div style={{ height: 80 }} />
+          <div style={{ height: 100 }} />
+        </>
+      )}
     </div>
   )
 }
