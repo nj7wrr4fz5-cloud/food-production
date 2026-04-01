@@ -6,27 +6,51 @@ const COMPANY_TYPES = [
   { id: 'quarter', name: 'Квартал', desc: 'Меню на квартал', emoji: '📅' }
 ]
 
-// Типы питания для офисов
-const OFFICE_MEALS = [
-  { id: 'breakfast', name: 'Завтрак', price: 280, emoji: '🥐' },
-  { id: 'lunch', name: 'Обед', price: 420, emoji: '🍱' },
-  { id: 'dinner', name: 'Ужин', price: 380, emoji: '🍽️' }
-]
-
-// Комплексы для производства и квартала
-const COMPLEXES = [
-  { id: 'breakfast', name: 'Завтрак', price: 280, emoji: '🥐' },
-  { id: 'lunch', name: 'Обед', price: 420, emoji: '🍱' },
-  { id: 'dinner', name: 'Ужин', price: 380, emoji: '🍽️' },
-  { id: 'night', name: 'Ночной обед', price: 420, emoji: '🌙' }
-]
+// Цены по типам питания
+const PRICES = {
+  regular: { breakfast: 280, lunch: 420, dinner: 380, night: 420 },
+  halal: { breakfast: 320, lunch: 480, dinner: 440, night: 480 },
+  pp: { breakfast: 350, lunch: 520, dinner: 460, night: 520 },
+  director: { breakfast: 420, lunch: 620, dinner: 560, night: 620 } // +20%
+}
 
 const FOOD_TYPES = [
-  { id: 'regular', name: 'Обычное', emoji: '🍽️' },
-  { id: 'halal', name: 'Халяль', emoji: '🥩' },
-  { id: 'pp', name: 'ПП', emoji: '🥗' },
-  { id: 'special', name: 'Специальное', emoji: '⭐' }
+  { id: 'regular', name: 'Обычное', emoji: '🍽️', price: 280 },
+  { id: 'halal', name: 'Халяль', emoji: '🥩', price: 320 },
+  { id: 'pp', name: 'ПП', emoji: '🥗', price: 350 },
+  { id: 'director', name: 'Директорат +20%', emoji: '👔', price: 420 }
 ]
+
+const MEALS = [
+  { id: 'breakfast', name: 'Завтрак', emoji: '🥐' },
+  { id: 'lunch', name: 'Обед', emoji: '🍱' },
+  { id: 'dinner', name: 'Ужин', emoji: '🍽️' },
+  { id: 'night', name: 'Ночной обед', emoji: '🌙' }
+]
+
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+const DAYS_RU = {
+  monday: 'Понедельник',
+  tuesday: 'Вторник',
+  wednesday: 'Среда',
+  thursday: 'Четверг',
+  friday: 'Пятница',
+  saturday: 'Суббота',
+  sunday: 'Воскресенье'
+}
+
+// Тестовые данные для клиента с договором
+const MOCK_CLIENT = {
+  company: 'ООО ТехноСтрой',
+  inn: '7812345678',
+  contact: 'Петров Сергей',
+  phone: '+7 (999) 123-45-67',
+  email: 'petrov@tehno.ru',
+  address: 'г. Санкт-Петербург, ул. Новая, д. 10',
+  companyType: 'office',
+  contractDate: '2025-01-15',
+  staff: { regular: 45, halal: 12, pp: 8, director: 3 }
+}
 
 const inputStyle = {
   width: '100%',
@@ -68,23 +92,13 @@ const buttonPrimaryStyle = {
   marginTop: 8
 }
 
-const buttonSecondaryStyle = {
-  width: '100%',
-  background: '#f5f5f5',
-  color: '#666',
-  border: 'none',
-  padding: '14px',
-  borderRadius: 8,
-  fontSize: 14,
-  cursor: 'pointer',
-  marginTop: 8
-}
-
 function App() {
-  const [step, setStep] = useState(1)
+  const [view, setView] = useState('login') // login, new-user, cabinet
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [companyType, setCompanyType] = useState('office')
   const [selectedMeals, setSelectedMeals] = useState([])
   const [selectedFoodTypes, setSelectedFoodTypes] = useState([])
+  const [selectedDay, setSelectedDay] = useState('monday')
   
   const [client, setClient] = useState({
     company: '',
@@ -99,12 +113,10 @@ function App() {
     regular: 0,
     halal: 0,
     pp: 0,
-    special: 0
+    director: 0
   })
 
-  const totalStaff = staff.regular + staff.halal + staff.pp + staff.special
-
-  const meals = companyType === 'office' ? OFFICE_MEALS : COMPLEXES
+  const totalStaff = staff.regular + staff.halal + staff.pp + staff.director
 
   const toggleMeal = (mealId) => {
     setSelectedMeals(prev => 
@@ -122,292 +134,290 @@ function App() {
     )
   }
 
-  const handleCompanySubmit = (e) => {
+  const handleNewUserSubmit = (e) => {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
-      setStep(2)
-    }
-  }
-
-  const handleStaffSubmit = (e) => {
-    e.preventDefault()
-    if (totalStaff > 0) {
-      setStep(3)
-    }
-  }
-
-  const handleOrderSubmit = (e) => {
-    e.preventDefault()
-    if (selectedMeals.length > 0 && selectedFoodTypes.length > 0) {
       alert('Заявка отправлена! Менеджер свяжется с вами для заключения договора.')
+      setView('login')
     }
   }
 
-  const getSelectedMeals = () => meals.filter(m => selectedMeals.includes(m.id))
-  const getSelectedFoodTypes = () => FOOD_TYPES.filter(f => selectedFoodTypes.includes(f.id))
+  const handleLogin = (type) => {
+    if (type === 'new') {
+      setView('new-user')
+    } else {
+      // Имитация входа клиента с договором
+      setIsLoggedIn(true)
+    }
+  }
 
-  return (
-    <div style={{ padding: 16, maxWidth: 600, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
-      <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <h1 style={{ fontSize: 28, marginBottom: 4, color: '#1976D2' }}>🍽️ Питание СПБ</h1>
-        <p style={{ color: '#666', marginTop: 0 }}>Система заказа корпоративного питания</p>
+  const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
+
+  const getTotalPrice = () => {
+    let total = 0
+    selectedMeals.forEach(meal => {
+      selectedFoodTypes.forEach(type => {
+        total += getPrice(type, meal)
+      })
+    })
+    return total
+  }
+
+  // === ВХОД ===
+  if (!isLoggedIn && view === 'login') {
+    return (
+      <div style={{ padding: 16, maxWidth: 500, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <h1 style={{ fontSize: 32, marginBottom: 8, color: '#1976D2' }}>🍽️ Питание СПБ</h1>
+          <p style={{ color: '#666', fontSize: 18 }}>Корпоративное питание</p>
+        </div>
+
+        <div style={sectionStyle}>
+          <h2 style={{ marginTop: 0, marginBottom: 20, textAlign: 'center' }}>Вход в систему</h2>
+          
+          <button 
+            onClick={() => handleLogin('existing')}
+            style={{...buttonPrimaryStyle, background: '#4CAF50'}}
+          >
+            🔐 Войти как клиент с договором
+          </button>
+
+          <button 
+            onClick={() => handleLogin('new')}
+            style={{...buttonPrimaryStyle, background: '#1976D2', marginTop: 12}}
+          >
+            🔓 Новый пользователь / Оставить заявку
+          </button>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 20, color: '#999', fontSize: 14 }}>
+          По вопросам: +7 (812) 123-45-67
+        </div>
       </div>
+    )
+  }
 
-      {/* ШАГ 1: Карточка клиента */}
-      {step === 1 && (
+  // === НОВЫЙ ПОЛЬЗОВАТЕЛЬ ===
+  if (view === 'new-user') {
+    return (
+      <div style={{ padding: 16, maxWidth: 600, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
+        <button 
+          onClick={() => setView('login')}
+          style={{ background: 'none', border: 'none', color: '#1976D2', cursor: 'pointer', marginBottom: 16, fontSize: 16 }}
+        >
+          ← Назад
+        </button>
+
         <div style={sectionStyle}>
           <h2 style={{ marginTop: 0, marginBottom: 20, color: '#333', fontSize: 18 }}>
             📋 Заявка на поставку питания
           </h2>
-          <form onSubmit={handleCompanySubmit}>
+          <form onSubmit={handleNewUserSubmit}>
             <label style={labelStyle}>Название компании *</label>
-            <input
-              type="text"
-              placeholder="ООО Ромашка"
-              value={client.company}
-              onChange={(e) => setClient({...client, company: e.target.value})}
-              style={inputStyle}
-              required
-            />
+            <input type="text" placeholder="ООО Ромашка" value={client.company}
+              onChange={(e) => setClient({...client, company: e.target.value})} style={inputStyle} required />
 
             <label style={labelStyle}>ИНН</label>
-            <input
-              type="text"
-              placeholder="1234567890"
-              value={client.inn}
-              onChange={(e) => setClient({...client, inn: e.target.value})}
-              style={inputStyle}
-            />
+            <input type="text" placeholder="1234567890" value={client.inn}
+              onChange={(e) => setClient({...client, inn: e.target.value})} style={inputStyle} />
 
             <label style={labelStyle}>Контактное лицо *</label>
-            <input
-              type="text"
-              placeholder="Иван Иванов"
-              value={client.contact}
-              onChange={(e) => setClient({...client, contact: e.target.value})}
-              style={inputStyle}
-              required
-            />
+            <input type="text" placeholder="Иван Иванов" value={client.contact}
+              onChange={(e) => setClient({...client, contact: e.target.value})} style={inputStyle} required />
 
             <label style={labelStyle}>Телефон *</label>
-            <input
-              type="tel"
-              placeholder="+7 (999) 123-45-67"
-              value={client.phone}
-              onChange={(e) => setClient({...client, phone: e.target.value})}
-              style={inputStyle}
-              required
-            />
+            <input type="tel" placeholder="+7 (999) 123-45-67" value={client.phone}
+              onChange={(e) => setClient({...client, phone: e.target.value})} style={inputStyle} required />
 
             <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              placeholder="info@company.ru"
-              value={client.email}
-              onChange={(e) => setClient({...client, email: e.target.value})}
-              style={inputStyle}
-            />
+            <input type="email" placeholder="info@company.ru" value={client.email}
+              onChange={(e) => setClient({...client, email: e.target.value})} style={inputStyle} />
 
             <label style={labelStyle}>Адрес доставки</label>
-            <input
-              type="text"
-              placeholder="г. Санкт-Петербург, ул. Примерная, д. 1"
-              value={client.address}
-              onChange={(e) => setClient({...client, address: e.target.value})}
-              style={inputStyle}
-            />
+            <input type="text" placeholder="г. Санкт-Петербург, ул. Примерная, д. 1" value={client.address}
+              onChange={(e) => setClient({...client, address: e.target.value})} style={inputStyle} />
 
             <label style={labelStyle}>Тип предприятия:</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
               {COMPANY_TYPES.map(type => (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => { setCompanyType(type.id); setSelectedMeals([]) }}
+                <button key={type.id} type="button" onClick={() => setCompanyType(type.id)}
                   style={{
                     padding: '16px 20px',
                     border: companyType === type.id ? '2px solid #1976D2' : '2px solid #e0e0e0',
                     borderRadius: 10,
                     background: companyType === type.id ? '#E3F2FD' : '#fafafa',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontSize: 16,
-                    transition: 'all 0.2s'
-                  }}
-                >
+                    cursor: 'pointer', textAlign: 'left', fontSize: 16
+                  }}>
                   <span style={{ fontSize: 22, marginRight: 12 }}>{type.emoji}</span>
-                  <b style={{ color: '#333' }}>{type.name}</b>
+                  <b>{type.name}</b>
                   <span style={{ color: '#666', fontSize: 14, marginLeft: 10 }}>{type.desc}</span>
                 </button>
               ))}
             </div>
 
             <button type="submit" style={buttonPrimaryStyle}>
-              Продолжить →
+              📤 Отправить заявку
             </button>
           </form>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* ШАГ 2: Количество сотрудников */}
-      {step === 2 && (
-        <div style={sectionStyle}>
-          <h2 style={{ marginTop: 0, marginBottom: 20, color: '#333', fontSize: 18 }}>
-            👥 Количество сотрудников
-          </h2>
-          
-          <div style={{ padding: 16, background: '#E3F2FD', borderRadius: 10, marginBottom: 20 }}>
-            <div style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#1976D2' }}>
-              Всего сотрудников: {totalStaff}
-            </div>
+  // === ЛИЧНЫЙ КАБИНЕТ КЛИЕНТА ===
+  return (
+    <div style={{ padding: 16, maxWidth: 600, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1 style={{ fontSize: 24, margin: 0, color: '#1976D2' }}>🍽️ Питание СПБ</h1>
+        <button onClick={() => setIsLoggedIn(false)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>
+          Выход
+        </button>
+      </div>
+
+      {/* Карточка клиента */}
+      <div style={sectionStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20 }}>{MOCK_CLIENT.company}</h2>
+            <p style={{ margin: '4px 0', color: '#666' }}>ИНН: {MOCK_CLIENT.inn}</p>
+            <p style={{ margin: '4px 0', color: '#666' }}>{MOCK_CLIENT.contact} • {MOCK_CLIENT.phone}</p>
+            <p style={{ margin: '4px 0', color: '#666' }}>📍 {MOCK_CLIENT.address}</p>
           </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ background: '#4CAF50', color: '#fff', padding: '4px 12px', borderRadius: 20, fontSize: 12 }}>
+              Договор подписан
+            </span>
+            <p style={{ margin: '4px 0', color: '#999', fontSize: 12 }}>от {MOCK_CLIENT.contractDate}</p>
+          </div>
+        </div>
+      </div>
 
-          <form onSubmit={handleStaffSubmit}>
-            {FOOD_TYPES.map(type => (
-              <div key={type.id} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                padding: '14px 16px',
-                background: '#fafafa',
-                borderRadius: 10,
-                marginBottom: 10
+      {/* Статистика */}
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>📊 Статистика питания</h3>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div style={{ padding: 16, background: '#E3F2FD', borderRadius: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 28, fontWeight: 'bold', color: '#1976D2' }}>{MOCK_CLIENT.staff.regular + MOCK_CLIENT.staff.halal + MOCK_CLIENT.staff.pp + MOCK_CLIENT.staff.director}</div>
+            <div style={{ fontSize: 14, color: '#666' }}>человек всего</div>
+          </div>
+          <div style={{ padding: 16, background: '#E8F5E9', borderRadius: 10, textAlign: 'center' }}>
+            <div style={{ fontSize: 28, fontWeight: 'bold', color: '#4CAF50' }}>5</div>
+            <div style={{ fontSize: 14, color: '#666' }}>дней в неделю</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{(MOCK_CLIENT.staff.regular + MOCK_CLIENT.staff.halal + MOCK_CLIENT.staff.pp + MOCK_CLIENT.staff.director) * 5}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>в день</div>
+          </div>
+          <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{(MOCK_CLIENT.staff.regular + MOCK_CLIENT.staff.halal + MOCK_CLIENT.staff.pp + MOCK_CLIENT.staff.director) * 22}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>в месяц</div>
+          </div>
+          <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{(MOCK_CLIENT.staff.regular + MOCK_CLIENT.staff.halal + MOCK_CLIENT.staff.pp + MOCK_CLIENT.staff.director) * 66}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>в квартал</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Меню */}
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>🍴 Меню на неделю</h3>
+        
+        <label style={labelStyle}>Выберите день:</label>
+        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)}
+          style={{...inputStyle, marginBottom: 20}}>
+          {DAYS.map(d => (
+            <option key={d} value={d}>{DAYS_RU[d]}</option>
+          ))}
+        </select>
+
+        <label style={labelStyle}>Типы питания:</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+          {FOOD_TYPES.map(type => (
+            <button key={type.id} onClick={() => toggleFoodType(type.id)}
+              style={{
+                padding: '10px 14px',
+                border: selectedFoodTypes.includes(type.id) ? '2px solid #1976D2' : '2px solid #e0e0e0',
+                borderRadius: 8,
+                background: selectedFoodTypes.includes(type.id) ? '#E3F2FD' : '#fafafa',
+                cursor: 'pointer', fontSize: 14
               }}>
-                <span>
-                  <span style={{ fontSize: 20, marginRight: 10 }}>{type.emoji}</span>
-                  <b style={{ color: '#333' }}>{type.name}</b>
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  value={staff[type.id]}
-                  onChange={(e) => setStaff({...staff, [type.id]: parseInt(e.target.value) || 0})}
-                  style={{
-                    width: '90px',
-                    padding: '10px',
-                    fontSize: 16,
-                    borderRadius: 8,
-                    border: '2px solid #e0e0e0',
-                    textAlign: 'center'
-                  }}
-                />
-              </div>
-            ))}
-
-            <button type="submit" disabled={totalStaff === 0} style={{
-              ...buttonPrimaryStyle,
-              background: totalStaff > 0 ? '#1976D2' : '#ccc'
-            }}>
-              Продолжить →
+              {type.emoji} {type.name}
             </button>
-
-            <button type="button" onClick={() => setStep(1)} style={buttonSecondaryStyle}>
-              ← Назад
-            </button>
-          </form>
+          ))}
         </div>
-      )}
 
-      {/* ШАГ 3: Выбор питания */}
-      {step === 3 && (
-        <div style={sectionStyle}>
-          <h2 style={{ marginTop: 0, marginBottom: 20, color: '#333', fontSize: 18 }}>
-            🍴 Выбор типа питания
-          </h2>
+        {/* Таблица цен */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ background: '#f5f5f5' }}>
+                <th style={{ padding: 12, textAlign: 'left', borderBottom: '2px solid #ddd' }}>Приём пищи</th>
+                {selectedFoodTypes.map(type => (
+                  <th key={type.id} style={{ padding: 12, textAlign: 'center', borderBottom: '2px solid #ddd' }}>
+                    {type.emoji} {type.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MEALS.map(meal => (
+                <tr key={meal.id}>
+                  <td style={{ padding: 12, borderBottom: '1px solid #eee' }}>
+                    {meal.emoji} {meal.name}
+                  </td>
+                  {selectedFoodTypes.map(type => (
+                    <td key={type.id} style={{ padding: 12, textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                      <span style={{ 
+                        background: type.id === 'director' ? '#FFF3E0' : '#E8F5E9',
+                        padding: '4px 12px',
+                        borderRadius: 16,
+                        fontWeight: '600',
+                        color: type.id === 'director' ? '#E65100' : '#2E7D32'
+                      }}>
+                        {getPrice(type.id, meal.id)}₽
+                      </span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Сводка */}
-          <div style={{ padding: 14, background: '#f5f7fa', borderRadius: 10, marginBottom: 20 }}>
-            <div style={{ fontWeight: '600', marginBottom: 6 }}>{client.company}</div>
-            <div style={{ fontSize: 14, color: '#666' }}>{client.contact} • {client.phone}</div>
-            <div style={{ fontSize: 14, color: '#666', marginTop: 4 }}>
-              <b>Тип:</b> {COMPANY_TYPES.find(c => c.id === companyType)?.name} • 
-              <b>Сотрудников:</b> {totalStaff}
+        {selectedFoodTypes.length > 0 && (
+          <div style={{ marginTop: 20, padding: 16, background: '#E3F2FD', borderRadius: 10 }}>
+            <div style={{ fontSize: 14, color: '#666' }}>Стоимость в день (все приёмы пищи):</div>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1976D2' }}>
+              {selectedFoodTypes.reduce((sum, type) => 
+                selectedMeals.reduce((s, meal) => s + getPrice(type.id, meal.id), sum), 0)}₽
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Выбор приёмов пищи */}
-          <label style={labelStyle}>Выберите приёмы пищи:</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-            {meals.map(meal => (
-              <button
-                key={meal.id}
-                type="button"
-                onClick={() => toggleMeal(meal.id)}
-                style={{
-                  padding: '16px 20px',
-                  border: selectedMeals.includes(meal.id) ? '2px solid #4CAF50' : '2px solid #e0e0e0',
-                  borderRadius: 10,
-                  background: selectedMeals.includes(meal.id) ? '#E8F5E9' : '#fafafa',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: 16,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <span>
-                  <span style={{ fontSize: 22, marginRight: 12 }}>{meal.emoji}</span>
-                  <b>{meal.name}</b>
-                </span>
-                <span style={{ color: '#4CAF50', fontWeight: '600' }}>{meal.price}₽</span>
-              </button>
-            ))}
+      {/* Время доставки */}
+      <div style={sectionStyle}>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>🚚 Время доставки</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>🥐 Завтрак</span>
+            <span style={{ fontWeight: '600' }}>07:30 - 08:30</span>
           </div>
-
-          {/* Выбор типа питания */}
-          <label style={labelStyle}>Выберите типы питания:</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-            {FOOD_TYPES.map(type => (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => toggleFoodType(type.id)}
-                style={{
-                  padding: '16px 20px',
-                  border: selectedFoodTypes.includes(type.id) ? '2px solid #1976D2' : '2px solid #e0e0e0',
-                  borderRadius: 10,
-                  background: selectedFoodTypes.includes(type.id) ? '#E3F2FD' : '#fafafa',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: 16
-                }}
-              >
-                <span style={{ fontSize: 22, marginRight: 12 }}>{type.emoji}</span>
-                <b>{type.name}</b>
-              </button>
-            ))}
+          <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>🍱 Обед</span>
+            <span style={{ fontWeight: '600' }}>12:00 - 13:00</span>
           </div>
-
-          {/* Итог */}
-          {selectedMeals.length > 0 && selectedFoodTypes.length > 0 && (
-            <div style={{ padding: 16, background: '#E8F5E9', borderRadius: 10, marginBottom: 20 }}>
-              <div style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>Предварительный итог:</div>
-              <div style={{ fontSize: 14, marginBottom: 4 }}>
-                <b>Приёмы пищи:</b> {getSelectedMeals().map(m => m.name).join(', ')}
-              </div>
-              <div style={{ fontSize: 14 }}>
-                <b>Типы питания:</b> {getSelectedFoodTypes().map(f => f.name).join(', ')}
-              </div>
-            </div>
-          )}
-
-          <button 
-            onClick={handleOrderSubmit}
-            disabled={selectedMeals.length === 0 || selectedFoodTypes.length === 0}
-            style={{
-              ...buttonPrimaryStyle,
-              background: (selectedMeals.length > 0 && selectedFoodTypes.length > 0) ? '#4CAF50' : '#ccc'
-            }}
-          >
-            📤 Отправить заявку на договор
-          </button>
-
-          <button type="button" onClick={() => setStep(2)} style={buttonSecondaryStyle}>
-            ← Назад
-          </button>
+          <div style={{ padding: 12, background: '#fafafa', borderRadius: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>🍽️ Ужин</span>
+            <span style={{ fontWeight: '600' }}>17:30 - 18:30</span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
