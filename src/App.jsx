@@ -9,7 +9,18 @@ const COMPANY_TYPES = [
 // ID Google таблицы
 const SPREADSHEET_ID = '1VRSHLi1eu7k5cT6lAYWvXbIToTpcMj1rx2saiWwENp4'
 
-// Типы событий для правил
+// Токен бота и ID группы
+const BOT_TOKEN = '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y'
+const GROUP_CHAT_ID = '-1002583331823'
+
+// ID топиков (thread IDs)
+const THREADS = {
+  waiting: '360',      // Ожидание
+  newUser: '361',      // Новый пользователь
+  history: '362',      // История
+  orders: '359'        // Заявки
+}
+
 const EVENT_TYPES = [
   { id: 'new_order', name: '📥 Новый заказ', emoji: '📋' },
   { id: 'new_user', name: '👤 Новая заявка', emoji: '👤' },
@@ -75,132 +86,106 @@ const buttonPrimaryStyle = {
   padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer'
 }
 
-// === ФУНКЦИИ РАБОТЫ С GOOGLE SHEETS ===
-// Эти функции будут вызывать API через бэкенд
-
-const loadFromSheet = async (sheetName) => {
-  // Заглушка - в реальном приложении здесь будет вызов API
-  // Пока используем localStorage как резерв
+// === TELEGRAM ===
+const sendToTelegram = async (message, threadId) => {
   try {
-    const saved = localStorage.getItem('food_' + sheetName)
-    if (saved) return JSON.parse(saved)
-  } catch (e) {}
-  return null
-}
-
-const saveToSheet = async (sheetName, data) => {
-  // Заглушка - в реальном приложении здесь будет вызов API
-  // Пока сохраняем в localStorage
-  try {
-    localStorage.setItem('food_' + sheetName, JSON.stringify(data))
-    return true
-  } catch (e) {
-    return false
-  }
-}
-
-// Загрузка клиентов из Google Sheets
-const loadClients = async () => {
-  const cached = await loadFromSheet('clients')
-  if (cached) return cached
-  
-  // Дефолтные клиенты если нет данных
-  return {
-    'TEST-001': {
-      id: 'TEST-001',
-      company: 'ООО ТехноСтрой',
-      inn: '7812345678',
-      contact: 'Петров Сергей',
-      phone: '+7 (999) 123-45-67',
-      email: 'petrov@tehno.ru',
-      address: 'г. Санкт-Петербург, ул. Новая, д. 10',
-      companyType: 'office',
-      contractDate: '2025-01-15',
-      paymentMethod: 'card',
-      paymentPeriod: 'monthly',
-      active: true,
-      featured: true,
-      discount: 10,
-      staff: { regular: 45, halal: 12, pp: 8, director: 3 },
-      meals: ['breakfast', 'lunch', 'dinner'],
-      deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
-      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-      adminComment: ''
-    },
-    'TEST-002': {
-      id: 'TEST-002',
-      company: 'ИП Сидоров',
-      inn: '7823456789',
-      contact: 'Сидоров Алексей',
-      phone: '+7 (999) 987-65-43',
-      address: 'г. Санкт-Петербург, пр. Ленина, д. 5',
-      companyType: 'plant',
-      contractDate: '2025-02-01',
-      paymentMethod: 'cash',
-      paymentPeriod: 'daily',
-      active: true,
-      featured: false,
-      discount: 5,
-      staff: { regular: 20, halal: 5, pp: 0, director: 1 },
-      meals: ['lunch', 'dinner'],
-      deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
-      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-      adminComment: 'VIP клиент'
-    }
-  }
-}
-
-// Дефолтные настройки Telegram
-const DEFAULT_TELEGRAM = {
-  bots: [
-    { id: 'bot1', name: 'Основной бот', token: '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y', active: true }
-  ],
-  groups: [
-    { id: 'group1', name: 'Основная группа', chatId: '-1002583331823', threads: {
-      history: '360',
-      waiting: '362',
-      newUser: '361',
-      orders: '359'
-    }}
-  ],
-  rules: [
-    { id: 'rule1', event: 'new_order', botId: 'bot1', groupId: 'group1', thread: 'waiting', enabled: true },
-    { id: 'rule2', event: 'new_user', botId: 'bot1', groupId: 'group1', thread: 'newUser', enabled: true },
-    { id: 'rule3', event: 'client_comment', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true },
-    { id: 'rule4', event: 'admin_edit', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true }
-  ]
-}
-
-// Отправка в Telegram
-const sendToTelegram = async (message, botToken, chatId, threadId) => {
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: GROUP_CHAT_ID,
         text: message,
         parse_mode: 'Markdown',
         message_thread_id: threadId
       })
     })
-    return true
+    const data = await response.json()
+    return data.ok
   } catch (err) {
     console.log('Telegram error:', err)
     return false
   }
 }
 
-// Отправка по правилам
-const sendByRules = async (event, message, telegramSettings) => {
-  const rules = telegramSettings.rules.filter(r => r.event === event && r.enabled)
-  
-  for (const rule of rules) {
-    const bot = telegramSettings.bots.find(b => b.id === rule.botId && b.active)
-    const group = telegramSettings.groups.find(g => g.id === rule.groupId)
-    if (bot && group) {
-      await sendToTelegram(message, bot.token, group.chatId, group.threads[rule.thread])
-    }
+const sendByEvent = async (eventType, message) => {
+  const threadMap = {
+    new_order: THREADS.waiting,
+    new_user: THREADS.newUser,
+    client_comment: THREADS.history,
+    admin_edit: THREADS.history,
+    order_confirmed: THREADS.orders,
+    order_cancelled: THREADS.orders
+  }
+  const threadId = threadMap[eventType]
+  return await sendToTelegram(message, threadId)
+}
+
+// === LOCAL STORAGE ===
+const loadFromStorage = (key) => {
+  try {
+    const data = localStorage.getItem('food_' + key)
+    return data ? JSON.parse(data) : null
+  } catch (e) { return null }
+}
+
+const saveToStorage = (key, data) => {
+  try {
+    localStorage.setItem('food_' + key, JSON.stringify(data))
+    return true
+  } catch (e) { return false }
+}
+
+// Дефолтные клиенты
+const DEFAULT_CLIENTS = {
+  'TEST-001': {
+    id: 'TEST-001', company: 'ООО ТехноСтрой', inn: '7812345678', contact: 'Петров Сергей',
+    phone: '+7 (999) 123-45-67', email: 'petrov@tehno.ru', address: 'г. Санкт-Петербург, ул. Новая, д. 10',
+    companyType: 'office', contractDate: '2025-01-15', paymentMethod: 'card', paymentPeriod: 'monthly',
+    active: true, featured: true, discount: 10,
+    staff: { regular: 45, halal: 12, pp: 8, director: 3 },
+    meals: ['breakfast', 'lunch', 'dinner'],
+    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
+    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: ''
+  },
+  'TEST-002': {
+    id: 'TEST-002', company: 'ИП Сидоров', inn: '7823456789', contact: 'Сидоров Алексей',
+    phone: '+7 (999) 987-65-43', address: 'г. Санкт-Петербург, пр. Ленина, д. 5',
+    companyType: 'plant', contractDate: '2025-02-01', paymentMethod: 'cash', paymentPeriod: 'daily',
+    active: true, featured: false, discount: 5,
+    staff: { regular: 20, halal: 5, pp: 0, director: 1 },
+    meals: ['lunch', 'dinner'],
+    deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
+    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'VIP клиент'
+  },
+  'TEST-003': {
+    id: 'TEST-003', company: 'АО Невский завод', inn: '7813000111', contact: 'Смирнова Екатерина',
+    phone: '+7 (999) 111-22-33', email: 'smirnova@nevskiy.ru', address: 'г. Санкт-Петербург, ул. Металлистов, д. 7',
+    companyType: 'office', contractDate: '2024-11-20', paymentMethod: 'account', paymentPeriod: 'monthly',
+    active: true, featured: false, discount: 7,
+    staff: { regular: 60, halal: 0, pp: 15, director: 10 },
+    meals: ['breakfast', 'lunch', 'dinner'],
+    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
+    manager: { name: 'Мария', phone: '+7 (999) 000-33-44' }, adminComment: 'Требует доставку к 12:00'
+  },
+  'TEST-004': {
+    id: 'TEST-004', company: 'ООО Северный берег', inn: '7814567890', contact: 'Козлов Дмитрий',
+    phone: '+7 (999) 222-33-44', email: 'kozlov@severbereg.ru', address: 'г. Санкт-Петербург, наб. реки Фонтанки, д. 28',
+    companyType: 'quarter', contractDate: '2024-10-01', paymentMethod: 'card', paymentPeriod: 'monthly',
+    active: true, featured: true, discount: 15,
+    staff: { regular: 120, halal: 30, pp: 20, director: 10 },
+    meals: ['breakfast', 'lunch', 'dinner'],
+    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
+    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'VIP - приоритетная доставка'
+  },
+  'DEMO': {
+    id: 'DEMO', company: 'Демо клиент', inn: '0000000000', contact: 'Тестовый пользователь',
+    phone: '+7 (999) 000-00-00', email: 'demo@test.ru', address: 'Тестовый адрес',
+    companyType: 'office', contractDate: '2025-01-01', paymentMethod: 'cash', paymentPeriod: 'daily',
+    active: true, featured: false, discount: 0,
+    staff: { regular: 10, halal: 0, pp: 0, director: 5 },
+    meals: ['lunch'],
+    deliveryTime: { lunch: '12:00-13:00' },
+    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'Тестовый аккаунт'
   }
 }
 
@@ -223,25 +208,18 @@ function App() {
     paymentMethod: 'card', paymentPeriod: 'monthly'
   })
 
-  // Настройки Telegram
-  const [telegramSettings, setTelegramSettings] = useState(DEFAULT_TELEGRAM)
-  const [telegramTab, setTelegramTab] = useState('bots')
-
   // Заказы
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Загрузка данных при старте
+  // Загрузка данных
   useEffect(() => {
-    const loadData = async () => {
-      const clientsData = await loadClients()
-      setClients(clientsData)
+    const loadData = () => {
+      const savedClients = loadFromStorage('clients')
+      setClients(savedClients || DEFAULT_CLIENTS)
       
-      const ordersData = await loadFromSheet('orders')
-      setOrders(ordersData || [])
-      
-      const telegramData = await loadFromSheet('telegram')
-      setTelegramSettings(telegramData || DEFAULT_TELEGRAM)
+      const savedOrders = loadFromStorage('orders')
+      setOrders(savedOrders || [])
       
       setLoading(false)
     }
@@ -251,21 +229,15 @@ function App() {
   // Сохранение при изменении
   useEffect(() => {
     if (!loading && Object.keys(clients).length > 0) {
-      saveToSheet('clients', clients)
+      saveToStorage('clients', clients)
     }
   }, [clients, loading])
 
   useEffect(() => {
     if (!loading && orders.length > 0) {
-      saveToSheet('orders', orders)
+      saveToStorage('orders', orders)
     }
   }, [orders, loading])
-
-  useEffect(() => {
-    if (!loading) {
-      saveToSheet('telegram', telegramSettings)
-    }
-  }, [telegramSettings, loading])
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
@@ -311,8 +283,8 @@ function App() {
   const handleNewUserSubmit = async (e) => {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
-      const message = `📋 *Новая заявка!*\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}`
-      await sendByRules('new_user', message, telegramSettings)
+      const message = `📋 *Новая заявка!*\n\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}\n*Тип:* ${COMPANY_TYPES.find(t => t.id === companyType)?.name || companyType}`
+      await sendByEvent('new_user', message)
       alert('Заявка отправлена!')
       navigate('login')
     }
@@ -320,8 +292,8 @@ function App() {
 
   const handleSendComment = async () => {
     if (comment.trim() && currentClient) {
-      const message = `💬 *${currentClient.company}:*\n${comment}`
-      await sendByRules('client_comment', message, telegramSettings)
+      const message = `💬 *${currentClient.company}:*\n\n${comment}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
+      await sendByEvent('client_comment', message)
       alert('Отправлено!')
       setComment('')
       setCommentSent(true)
@@ -346,7 +318,7 @@ function App() {
 
       if (changes.length > 0) {
         const logMessage = `📝 *Изменение: ${editingClient.company}*\n\n${changes.join('\n')}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
-        await sendByRules('admin_edit', logMessage, telegramSettings)
+        await sendByEvent('admin_edit', logMessage)
       }
 
       setEditingClient(null)
@@ -374,91 +346,61 @@ function App() {
 
     setOrders(prev => [...prev, newOrder])
 
-    const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n*Завтрак:* ${newOrder.meals.breakfast}\n*Обед:* ${newOrder.meals.lunch}\n*Ужин:* ${newOrder.meals.dinner}\n\n*Стоимость:* ${newOrder.total.toLocaleString()}₽`
-    await sendByRules('new_order', orderMessage, telegramSettings)
+    const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
+    await sendByEvent('new_order', orderMessage)
 
     alert('Заказ отправлен на согласование!')
   }
 
-  // Добавление бота
-  const addBot = () => {
-    const newBot = {
-      id: 'bot' + Date.now(),
-      name: 'Новый бот ' + (telegramSettings.bots.length + 1),
-      token: '',
-      active: true
+  const addNewClient = () => {
+    const newId = 'NEW-' + Date.now().toString().slice(-4).toUpperCase()
+    const newClient = {
+      id: newId,
+      company: '',
+      inn: '',
+      contact: '',
+      phone: '',
+      email: '',
+      address: '',
+      companyType: 'office',
+      contractDate: new Date().toISOString().split('T')[0],
+      paymentMethod: 'card',
+      paymentPeriod: 'monthly',
+      active: true,
+      featured: false,
+      discount: 0,
+      staff: { regular: 0, halal: 0, pp: 0, director: 0 },
+      meals: ['lunch'],
+      deliveryTime: { lunch: '12:00-13:00' },
+      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
+      adminComment: ''
     }
-    setTelegramSettings({
-      ...telegramSettings,
-      bots: [...telegramSettings.bots, newBot]
-    })
+    setEditingClient(newClient)
   }
 
-  const removeBot = (botId) => {
-    setTelegramSettings({
-      ...telegramSettings,
-      bots: telegramSettings.bots.filter(b => b.id !== botId),
-      rules: telegramSettings.rules.map(r => r.botId === botId ? { ...r, enabled: false } : r)
-    })
-  }
-
-  const addGroup = () => {
-    const newGroup = {
-      id: 'group' + Date.now(),
-      name: 'Новая группа ' + (telegramSettings.groups.length + 1),
-      chatId: '',
-      threads: { history: '', waiting: '', newUser: '', orders: '' }
+  const deleteClient = async (clientId) => {
+    if (confirm('Удалить клиента?')) {
+      const c = clients[clientId]
+      const message = `🗑️ *Клиент удалён:* ${c.company}\nID: ${clientId}\n📅 ${new Date().toLocaleString('ru-RU')}`
+      await sendByEvent('admin_edit', message)
+      setClients(prev => {
+        const updated = { ...prev }
+        delete updated[clientId]
+        return updated
+      })
     }
-    setTelegramSettings({
-      ...telegramSettings,
-      groups: [...telegramSettings.groups, newGroup]
-    })
   }
 
-  const removeGroup = (groupId) => {
-    setTelegramSettings({
-      ...telegramSettings,
-      groups: telegramSettings.groups.filter(g => g.id !== groupId),
-      rules: telegramSettings.rules.map(r => r.groupId === groupId ? { ...r, enabled: false } : r)
-    })
-  }
-
-  const addRule = () => {
-    const newRule = {
-      id: 'rule' + Date.now(),
-      event: 'new_order',
-      botId: telegramSettings.bots[0]?.id || '',
-      groupId: telegramSettings.groups[0]?.id || '',
-      thread: 'waiting',
-      enabled: true
-    }
-    setTelegramSettings({
-      ...telegramSettings,
-      rules: [...telegramSettings.rules, newRule]
-    })
-  }
-
-  const removeRule = (ruleId) => {
-    setTelegramSettings({
-      ...telegramSettings,
-      rules: telegramSettings.rules.filter(r => r.id !== ruleId)
-    })
-  }
-
-  const testTelegram = async (botId, groupId) => {
-    const bot = telegramSettings.bots.find(b => b.id === botId)
-    const group = telegramSettings.groups.find(g => g.id === groupId)
-    if (bot && group) {
-      const success = await sendToTelegram('🧪 *Тестовое сообщение*\nНастройки работают!', bot.token, group.chatId, group.threads.history)
-      alert(success ? 'Тестовое сообщение отправлено!' : 'Ошибка отправки')
-    } else {
-      alert('Выберите бота и группу')
-    }
+  const testTelegram = async () => {
+    const message = `🧪 *Тестовое сообщение*\n\nНастройки Telegram работают!\n\n⏰ ${new Date().toLocaleString('ru-RU')}`
+    const success = await sendToTelegram(message, THREADS.history)
+    alert(success ? 'Тестовое сообщение отправлено!' : 'Ошибка отправки')
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
   const getPaymentMethodName = (id) => PAYMENT_METHODS.find(p => p.id === id)?.name || id
   const getPaymentPeriodName = (id) => PAYMENT_PERIODS.find(p => p.id === id)?.name || id
+  const getCompanyTypeName = (id) => COMPANY_TYPES.find(t => t.id === id)?.name || id
 
   const todayOrders = orders.filter(o => o.status === 'waiting')
 
@@ -466,7 +408,7 @@ function App() {
     return (
       <div style={{ padding: 20, textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
         <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
-        <div>Загрузка данных...</div>
+        <div>Загрузка...</div>
       </div>
     )
   }
@@ -540,7 +482,7 @@ function App() {
     return (
       <div style={{ padding: 16, maxWidth: 900, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h1 style={{ fontSize: 22, margin: 0, color: '#1976D2' }}>⚙️ Админ</h1>
+          <h1 style={{ fontSize: 22, margin: 0, color: '#1976D2' }}>⚙️ Админ-панель</h1>
           <button onClick={() => navigate('login')} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Выход</button>
         </div>
 
@@ -560,8 +502,13 @@ function App() {
           ))}
         </div>
 
+        {/* === КЛИЕНТЫ === */}
         {tab === 'clients' && (
           <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: '#666' }}>Всего: {Object.keys(clients).length} клиентов</span>
+              <button onClick={addNewClient} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить клиента</button>
+            </div>
             {Object.values(clients).map(c => (
               <div key={c.id} style={{ ...sectionStyle, borderLeft: c.featured ? '4px solid #FF9800' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -573,44 +520,61 @@ function App() {
                     </div>
                     <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
                   </div>
-                  <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
+                    <button onClick={() => deleteClient(c.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                  </div>
                 </div>
                 {c.adminComment && (
                   <div style={{ padding: 10, background: '#FFF3E0', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
                     💬 {c.adminComment}
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 13 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 13 }}>
+                  <div>Тип: <b>{getCompanyTypeName(c.companyType)}</b></div>
                   <div>Скидка: <b>{c.discount}%</b></div>
                   <div>Оплата: <b>{getPaymentMethodName(c.paymentMethod)}</b></div>
                   <div>Менеджер: <b>{c.manager?.name || '-'}</b></div>
                   <div>Тел: <b>{c.manager?.phone || '-'}</b></div>
+                  <div>Договор: <b>{c.contractDate || '-'}</b></div>
                 </div>
               </div>
             ))}
           </div>
         )}
 
+        {/* === ЗАКАЗЫ === */}
         {tab === 'orders' && (
           <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0 }}>Все заказы ({orders.length})</h3>
-            {orders.map(order => {
-              const clientName = clients[order.clientId]?.company || 'Unknown'
-              return (
-                <div key={order.id} style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: '600' }}>{clientName}</div>
-                    <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.total.toLocaleString()}₽</div>
+            <h3 style={{ marginTop: 0 }}>📋 Все заказы ({orders.length})</h3>
+            {orders.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Нет заказов</div>
+            ) : (
+              orders.map(order => {
+                const clientName = clients[order.clientId]?.company || 'Unknown'
+                return (
+                  <div key={order.id} style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600' }}>{clientName}</div>
+                      <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.date}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        🥐{order.meals.breakfast} • 🍱{order.meals.lunch} • 🍽️{order.meals.dinner}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 'bold' }}>{order.total.toLocaleString()}₽</div>
+                      <span style={{ padding: '4px 12px', background: order.status === 'waiting' ? '#FFF3E0' : '#E8F5E9', borderRadius: 16, fontSize: 12 }}>
+                        {order.status === 'waiting' ? '⏳ Ожидание' : '✓ Подтверждён'}
+                      </span>
+                    </div>
                   </div>
-                  <span style={{ padding: '4px 12px', background: order.status === 'waiting' ? '#FFF3E0' : '#E8F5E9', borderRadius: 16, fontSize: 12 }}>
-                    {order.status === 'waiting' ? '⏳ Ожидание' : '✓ Подтверждён'}
-                  </span>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         )}
 
+        {/* === ОЖИДАНИЕ === */}
         {tab === 'waiting' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования ({orders.filter(o => o.status === 'waiting').length})</h3>
@@ -626,18 +590,18 @@ function App() {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 'bold', color: '#FF9800' }}>{order.total.toLocaleString()}₽</div>
                       <div style={{ fontSize: 12, color: '#666' }}>
-                        завтрак: {order.meals.breakfast} • обед: {order.meals.lunch} • ужин: {order.meals.dinner}
+                        🥐{order.meals.breakfast} • 🍱{order.meals.lunch} • 🍽️{order.meals.dinner}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => {
+                    <button onClick={async () => {
                       setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))
-                      sendByRules('order_confirmed', `✅ *Заказ подтверждён*\n${clientName}\n${DAYS_RU[order.day]}`, telegramSettings)
+                      await sendByEvent('order_confirmed', `✅ *Заказ подтверждён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}\n\n💰 Сумма: ${order.total.toLocaleString()}₽`)
                     }} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
-                    <button onClick={() => {
+                    <button onClick={async () => {
                       setOrders(prev => prev.filter(o => o.id !== order.id))
-                      sendByRules('order_cancelled', `❌ *Заказ отменён*\n${clientName}\n${DAYS_RU[order.day]}`, telegramSettings)
+                      await sendByEvent('order_cancelled', `❌ *Заказ отменён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}`)
                     }} style={{ flex: 1, padding: '8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✕ Отклонить</button>
                   </div>
                 </div>
@@ -651,167 +615,71 @@ function App() {
 
         {/* === TELEGRAM === */}
         {tab === 'telegram' && (
-          <div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              {[
-                { id: 'bots', name: '🤖 Боты' },
-                { id: 'groups', name: '💬 Группы' },
-                { id: 'rules', name: '📋 Правила' }
-              ].map(t => (
-                <button key={t.id} onClick={() => setTelegramTab(t.id)}
-                  style={{
-                    padding: '8px 12px', border: 'none', borderRadius: 6,
-                    background: telegramTab === t.id ? '#4CAF50' : '#e0e0e0', color: telegramTab === t.id ? '#fff' : '#333',
-                    cursor: 'pointer', fontSize: 13
-                  }}>{t.name}</button>
-              ))}
+          <div style={sectionStyle}>
+            <h3 style={{ marginTop: 0 }}>📱 Настройки Telegram</h3>
+            
+            <div style={{ padding: 12, background: '#E8F5E9', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>🤖 Бот</div>
+              <div style={{ fontSize: 13 }}>Token: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{BOT_TOKEN.slice(0, 15)}...</code></div>
+              <div style={{ fontSize: 13 }}>Статус: <span style={{ color: '#4CAF50' }}>✅ Подключён</span></div>
             </div>
 
-            {telegramTab === 'bots' && (
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ margin: 0 }}>🤖 Боты ({telegramSettings.bots.length})</h3>
-                  <button onClick={addBot} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
-                </div>
-                {telegramSettings.bots.map(bot => (
-                  <div key={bot.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="checkbox" checked={bot.active} onChange={(e) => {
-                          setTelegramSettings({
-                            ...telegramSettings,
-                            bots: telegramSettings.bots.map(b => b.id === bot.id ? { ...b, active: e.target.checked } : b)
-                          })
-                        }} />
-                        <b>{bot.name}</b>
-                      </label>
-                      <button onClick={() => removeBot(bot.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
-                    </div>
-                    <input type="text" placeholder="Bot Token" value={bot.token}
-                      onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        bots: telegramSettings.bots.map(b => b.id === bot.id ? { ...b, token: e.target.value } : b)
-                      })} style={{ ...inputStyle, marginBottom: 0 }} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>💬 Группа</div>
+              <div style={{ fontSize: 13 }}>Chat ID: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{GROUP_CHAT_ID}</code></div>
+              <div style={{ fontSize: 13 }}>Ссылка: <a href="https://t.me/test_shyrik/223" target="_blank" style={{ color: '#1976D2' }}>t.me/test_shyrik/223</a></div>
+            </div>
 
-            {telegramTab === 'groups' && (
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ margin: 0 }}>💬 Группы ({telegramSettings.groups.length})</h3>
-                  <button onClick={addGroup} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
-                </div>
-                {telegramSettings.groups.map(group => (
-                  <div key={group.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <input type="text" placeholder="Название группы" value={group.name}
-                        onChange={(e) => setTelegramSettings({
-                          ...telegramSettings,
-                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, name: e.target.value } : g)
-                        })} style={{ ...inputStyle, marginBottom: 0, width: '60%' }} />
-                      <button onClick={() => removeGroup(group.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
-                    </div>
-                    <input type="text" placeholder="Chat ID" value={group.chatId}
-                      onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, chatId: e.target.value } : g)
-                      })} style={{ ...inputStyle, marginBottom: 8 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input type="text" placeholder="История" value={group.threads.history}
-                        onChange={(e) => setTelegramSettings({
-                          ...telegramSettings,
-                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, history: e.target.value } } : g)
-                        })} style={{ ...inputStyle, marginBottom: 0 }} />
-                      <input type="text" placeholder="Ожидание" value={group.threads.waiting}
-                        onChange={(e) => setTelegramSettings({
-                          ...telegramSettings,
-                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, waiting: e.target.value } } : g)
-                        })} style={{ ...inputStyle, marginBottom: 0 }} />
-                      <input type="text" placeholder="Новый пользователь" value={group.threads.newUser}
-                        onChange={(e) => setTelegramSettings({
-                          ...telegramSettings,
-                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, newUser: e.target.value } } : g)
-                        })} style={{ ...inputStyle, marginBottom: 0 }} />
-                      <input type="text" placeholder="Заявки" value={group.threads.orders}
-                        onChange={(e) => setTelegramSettings({
-                          ...telegramSettings,
-                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, orders: e.target.value } } : g)
-                        })} style={{ ...inputStyle, marginBottom: 0 }} />
-                    </div>
-                  </div>
-                ))}
+            <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 12 }}>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>📋 Топики</div>
+              <div style={{ fontSize: 13, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>📥 Ожидание: <b>{THREADS.waiting}</b></div>
+                <div>👤 Новый: <b>{THREADS.newUser}</b></div>
+                <div>📜 История: <b>{THREADS.history}</b></div>
+                <div>📋 Заявки: <b>{THREADS.orders}</b></div>
               </div>
-            )}
+            </div>
 
-            {telegramTab === 'rules' && (
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ margin: 0 }}>📋 Правила ({telegramSettings.rules.length})</h3>
-                  <button onClick={addRule} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
-                </div>
-                {telegramSettings.rules.map(rule => (
-                  <div key={rule.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input type="checkbox" checked={rule.enabled} onChange={(e) => {
-                          setTelegramSettings({
-                            ...telegramSettings,
-                            rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, enabled: e.target.checked } : r)
-                          })
-                        }} />
-                        <b>Правило</b>
-                      </label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => testTelegram(rule.botId, rule.groupId)} style={{ padding: '4px 8px', background: '#FF9800', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Тест</button>
-                        <button onClick={() => removeRule(rule.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <select value={rule.event} onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, event: e.target.value } : r)
-                      })} style={inputStyle}>
-                        {EVENT_TYPES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                      </select>
-                      <select value={rule.thread} onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, thread: e.target.value } : r)
-                      })} style={inputStyle}>
-                        <option value="history">📜 История</option>
-                        <option value="waiting">📥 Ожидание</option>
-                        <option value="newUser">👤 Новый пользователь</option>
-                        <option value="orders">📋 Заявки</option>
-                      </select>
-                      <select value={rule.botId} onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, botId: e.target.value } : r)
-                      })} style={inputStyle}>
-                        {telegramSettings.bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                      </select>
-                      <select value={rule.groupId} onChange={(e) => setTelegramSettings({
-                        ...telegramSettings,
-                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, groupId: e.target.value } : r)
-                      })} style={inputStyle}>
-                        {telegramSettings.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+            <button onClick={testTelegram} style={{ ...buttonPrimaryStyle, background: '#FF9800', marginBottom: 12 }}>
+              🧪 Тестовое сообщение
+            </button>
+
+            <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8 }}>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>📊 Ссылки на топики</div>
+              <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <a href="https://t.me/test_shyrik/360" target="_blank" style={{ color: '#1976D2' }}>📥 Ожидание</a>
+                <a href="https://t.me/test_shyrik/361" target="_blank" style={{ color: '#1976D2' }}>👤 Новый пользователь</a>
+                <a href="https://t.me/test_shyrik/362" target="_blank" style={{ color: '#1976D2' }}>📜 История</a>
+                <a href="https://t.me/test_shyrik/359" target="_blank" style={{ color: '#1976D2' }}>📋 Заявки</a>
               </div>
-            )}
+            </div>
 
-            <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13, marginTop: 16 }}>
-              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть таблицу</a>
+            <div style={{ marginTop: 16, padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
+              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
             </div>
           </div>
         )}
 
+        {/* === РЕДАКТИРОВАНИЕ КЛИЕНТА === */}
         {editingClient && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
             <div style={{ background: '#fff', padding: 24, borderRadius: 16, maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-              <h2 style={{ marginTop: 0 }}>Редактирование</h2>
+              <h2 style={{ marginTop: 0 }}>Редактирование: {editingClient.id}</h2>
+
+              <label style={labelStyle}>Компания:</label>
+              <input type="text" value={editingClient.company} onChange={(e) => setEditingClient({...editingClient, company: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>Контакт:</label>
+              <input type="text" value={editingClient.contact} onChange={(e) => setEditingClient({...editingClient, contact: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>Телефон:</label>
+              <input type="text" value={editingClient.phone} onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>Email:</label>
+              <input type="text" value={editingClient.email || ''} onChange={(e) => setEditingClient({...editingClient, email: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>Адрес:</label>
+              <input type="text" value={editingClient.address} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -827,6 +695,11 @@ function App() {
               <label style={labelStyle}>Скидка (%):</label>
               <input type="number" value={editingClient.discount} onChange={(e) => setEditingClient({...editingClient, discount: parseInt(e.target.value) || 0})} style={inputStyle} />
 
+              <label style={labelStyle}>Тип предприятия:</label>
+              <select value={editingClient.companyType} onChange={(e) => setEditingClient({...editingClient, companyType: e.target.value})} style={inputStyle}>
+                {COMPANY_TYPES.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
+              </select>
+
               <label style={labelStyle}>Оплата:</label>
               <select value={editingClient.paymentMethod} onChange={(e) => setEditingClient({...editingClient, paymentMethod: e.target.value})} style={inputStyle}>
                 {PAYMENT_METHODS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -836,9 +709,6 @@ function App() {
               <select value={editingClient.paymentPeriod} onChange={(e) => setEditingClient({...editingClient, paymentPeriod: e.target.value})} style={inputStyle}>
                 {PAYMENT_PERIODS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-
-              <label style={labelStyle}>Адрес:</label>
-              <input type="text" value={editingClient.address} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} />
 
               <label style={labelStyle}>Приёмы:</label>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -853,13 +723,6 @@ function App() {
                 ))}
               </div>
 
-              <label style={labelStyle}>Время доставки:</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <input type="text" placeholder="Завтрак" value={editingClient.deliveryTime?.breakfast || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: {...editingClient.deliveryTime, breakfast: e.target.value}})} style={inputStyle} />
-                <input type="text" placeholder="Обед" value={editingClient.deliveryTime?.lunch || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: {...editingClient.deliveryTime, lunch: e.target.value}})} style={inputStyle} />
-                <input type="text" placeholder="Ужин" value={editingClient.deliveryTime?.dinner || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: {...editingClient.deliveryTime, dinner: e.target.value}})} style={inputStyle} />
-              </div>
-
               <label style={labelStyle}>Менеджер:</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                 <input type="text" placeholder="Имя" value={editingClient.manager?.name || ''} onChange={(e) => setEditingClient({...editingClient, manager: {...editingClient.manager, name: e.target.value}})} style={inputStyle} />
@@ -870,7 +733,7 @@ function App() {
               <textarea value={editingClient.adminComment || ''} onChange={(e) => setEditingClient({...editingClient, adminComment: e.target.value})} style={{ ...inputStyle, height: 80 }} />
 
               <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={saveClientEdit} style={{ ...buttonPrimaryStyle, background: '#4CAF50' }}>Сохранить</button>
+                <button onClick={saveClientEdit} style={{ ...buttonPrimaryStyle, background: '#4CAF50' }}>💾 Сохранить</button>
                 <button onClick={() => setEditingClient(null)} style={{ ...buttonPrimaryStyle, background: '#f44336' }}>Отмена</button>
               </div>
             </div>
@@ -1006,7 +869,7 @@ function App() {
             {currentClient.deliveryTime?.dinner && <div style={{ fontSize: 13 }}>🍽️ {currentClient.deliveryTime.dinner}</div>}
           </div>
           <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0, fontSize: 14 }}>💬 Сообщение</h3>
+            <h3 style={{ marginTop: 0, fontSize: 14 }}>💬 Сообщение менеджеру</h3>
             {commentSent ? (
               <div style={{ padding: 12, background: '#E8F5E9', borderRadius: 8, textAlign: 'center' }}>
                 <span style={{ fontSize: 20 }}>✅</span>
