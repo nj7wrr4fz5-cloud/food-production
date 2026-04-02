@@ -6,7 +6,8 @@ const COMPANY_TYPES = [
   { id: 'quarter', name: 'Квартал', emoji: '📅' }
 ]
 
-const CLIENTS_DB = {
+// Начальные данные клиентов
+const INITIAL_CLIENTS = {
   'TEST-001': {
     id: 'TEST-001',
     company: 'ООО ТехноСтрой',
@@ -50,16 +51,42 @@ const CLIENTS_DB = {
   }
 }
 
-// ID тем из Telegram
-const THREADS = {
-  history: '360',      // История - лог изменений
-  waiting: '362',      // Ожидание - заказы на согласование
-  newUser: '361',      // Новый пользователь
-  orders: '359'        // Заявки
-}
+// Начальные заказы
+const INITIAL_ORDERS = [
+  { id: 1, clientId: 'TEST-001', date: '2026-04-02', day: 'tuesday', meals: { breakfast: 45, lunch: 68, dinner: 45 }, status: 'waiting', total: 85400 },
+  { id: 2, clientId: 'TEST-001', date: '2026-04-03', day: 'wednesday', meals: { breakfast: 44, lunch: 67, dinner: 44 }, status: 'waiting', total: 83120 },
+]
 
-const BOT_TOKEN = '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y'
-const CHAT_ID = '-1002583331823'
+// Типы событий для правил
+const EVENT_TYPES = [
+  { id: 'new_order', name: '📥 Новый заказ', emoji: '📋' },
+  { id: 'new_user', name: '👤 Новая заявка', emoji: '👤' },
+  { id: 'client_comment', name: '💬 Комментарий клиента', emoji: '💬' },
+  { id: 'admin_edit', name: '📝 Изменение в админке', emoji: '📝' },
+  { id: 'order_confirmed', name: '✅ Подтверждён заказ', emoji: '✅' },
+  { id: 'order_cancelled', name: '❌ Отменён заказ', emoji: '❌' }
+]
+
+// Дефолтные настройки Telegram
+const DEFAULT_TELEGRAM = {
+  bots: [
+    { id: 'bot1', name: 'Основной бот', token: '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y', active: true }
+  ],
+  groups: [
+    { id: 'group1', name: 'Основная группа', chatId: '-1002583331823', threads: {
+      history: '360',
+      waiting: '362',
+      newUser: '361',
+      orders: '359'
+    }}
+  ],
+  rules: [
+    { id: 'rule1', event: 'new_order', botId: 'bot1', groupId: 'group1', thread: 'waiting', enabled: true },
+    { id: 'rule2', event: 'new_user', botId: 'bot1', groupId: 'group1', thread: 'newUser', enabled: true },
+    { id: 'rule3', event: 'client_comment', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true },
+    { id: 'rule4', event: 'admin_edit', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true }
+  ]
+}
 
 const PRICES = {
   regular: { breakfast: 280, lunch: 420, dinner: 380 },
@@ -103,6 +130,7 @@ const inputStyle = {
   border: '2px solid #e0e0e0', marginBottom: 12, boxSizing: 'border-box', background: '#fff'
 }
 
+
 const labelStyle = {
   fontWeight: '600', display: 'block', marginBottom: 6, fontSize: 13, color: '#333'
 }
@@ -117,21 +145,72 @@ const buttonPrimaryStyle = {
   padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer'
 }
 
-// Отправка в Telegram с указанием темы
-const sendToTelegram = async (message, threadId) => {
+// === ФУНКЦИИ СОХРАНЕНИЯ ===
+const STORAGE_KEYS = {
+  clients: 'food_clients',
+  orders: 'food_orders',
+  telegram: 'food_telegram'
+}
+
+
+// Загрузка данных
+const loadData = (key, defaultData) => {
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const saved = localStorage.getItem(key)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Проверяем, что данные не пустые
+      if (parsed && Object.keys(parsed).length > 0) {
+        return parsed
+      }
+    }
+  } catch (e) {
+    console.log('Load error:', key, e)
+  }
+  return defaultData
+}
+
+// Сохранение данных
+const saveData = (key, data) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data))
+    return true
+  } catch (e) {
+    console.log('Save error:', key, e)
+    return false
+  }
+}
+
+// Отправка в Telegram
+const sendToTelegram = async (message, botToken, chatId, threadId) => {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: CHAT_ID,
+        chat_id: chatId,
         text: message,
         parse_mode: 'Markdown',
         message_thread_id: threadId
       })
     })
+    return true
   } catch (err) {
     console.log('Telegram error:', err)
+    return false
+  }
+}
+
+// Отправка по правилам
+const sendByRules = async (event, message, telegramSettings) => {
+  const rules = telegramSettings.rules.filter(r => r.event === event && r.enabled)
+  
+  for (const rule of rules) {
+    const bot = telegramSettings.bots.find(b => b.id === rule.botId && b.active)
+    const group = telegramSettings.groups.find(g => g.id === rule.groupId)
+    if (bot && group) {
+      await sendToTelegram(message, bot.token, group.chatId, group.threads[rule.thread])
+    }
   }
 }
 
@@ -141,7 +220,7 @@ function App() {
   const [contractNumber, setContractNumber] = useState('')
   const [loginError, setLoginError] = useState('')
   const [currentClient, setCurrentClient] = useState(null)
-  const [clients, setClients] = useState(CLIENTS_DB)
+  const [clients, setClients] = useState(() => loadData(STORAGE_KEYS.clients, INITIAL_CLIENTS))
   const [editingClient, setEditingClient] = useState(null)
   const [companyType, setCompanyType] = useState('office')
   const [selectedMeals, setSelectedMeals] = useState([])
@@ -154,11 +233,26 @@ function App() {
     paymentMethod: 'card', paymentPeriod: 'monthly'
   })
 
+  // Настройки Telegram
+  const [telegramSettings, setTelegramSettings] = useState(() => loadData(STORAGE_KEYS.telegram, DEFAULT_TELEGRAM))
+  const [telegramTab, setTelegramTab] = useState('bots')
+
   // Заказы
-  const [orders, setOrders] = useState([
-    { id: 1, clientId: 'TEST-001', date: '2026-04-02', day: 'tuesday', meals: { breakfast: 45, lunch: 68, dinner: 45 }, status: 'waiting', total: 85400 },
-    { id: 2, clientId: 'TEST-001', date: '2026-04-03', day: 'wednesday', meals: { breakfast: 44, lunch: 67, dinner: 44 }, status: 'waiting', total: 83120 },
-  ])
+  const [orders, setOrders] = useState(() => loadData(STORAGE_KEYS.orders, INITIAL_ORDERS))
+
+  // Сохранение при изменении
+  useEffect(() => {
+    saveData(STORAGE_KEYS.clients, clients)
+  }, [clients])
+
+
+  useEffect(() => {
+    saveData(STORAGE_KEYS.orders, orders)
+  }, [orders])
+
+  useEffect(() => {
+    saveData(STORAGE_KEYS.telegram, telegramSettings)
+  }, [telegramSettings])
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
@@ -205,7 +299,7 @@ function App() {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
       const message = `📋 *Новая заявка!*\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}`
-      await sendToTelegram(message, THREADS.orders)
+      await sendByRules('new_user', message, telegramSettings)
       alert('Заявка отправлена!')
       navigate('login')
     }
@@ -214,20 +308,18 @@ function App() {
   const handleSendComment = async () => {
     if (comment.trim() && currentClient) {
       const message = `💬 *${currentClient.company}:*\n${comment}`
-      await sendToTelegram(message, THREADS.history)
+      await sendByRules('client_comment', message, telegramSettings)
       alert('Отправлено!')
       setComment('')
       setCommentSent(true)
     }
   }
 
-  // Сохранение изменений клиента с отправкой в историю
   const saveClientEdit = async () => {
     if (editingClient) {
       const oldClient = clients[editingClient.id]
       const changes = []
 
-      // Собираем изменения
       if (oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
       if (oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
       if (oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
@@ -239,10 +331,9 @@ function App() {
 
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
 
-      // Отправляем лог в историю
       if (changes.length > 0) {
         const logMessage = `📝 *Изменение: ${editingClient.company}*\n\n${changes.join('\n')}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
-        await sendToTelegram(logMessage, THREADS.history)
+        await sendByRules('admin_edit', logMessage, telegramSettings)
       }
 
       setEditingClient(null)
@@ -250,7 +341,6 @@ function App() {
     }
   }
 
-  // Создание заказа
   const createOrder = async () => {
     const newOrder = {
       id: Date.now(),
@@ -262,22 +352,96 @@ function App() {
       total: 0
     }
 
-    // Добавляем выбранные приёмы
     selectedMeals.forEach(m => {
       newOrder.meals[m] = currentClient.staff?.regular || 0
     })
 
-    // Считаем стоимость
     const pricePerMeal = PRICES.regular.lunch
     newOrder.total = (newOrder.meals.breakfast + newOrder.meals.lunch + newOrder.meals.dinner) * pricePerMeal
 
     setOrders(prev => [...prev, newOrder])
 
-    // Отправляем в ожидание
+
     const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n*Завтрак:* ${newOrder.meals.breakfast}\n*Обед:* ${newOrder.meals.lunch}\n*Ужин:* ${newOrder.meals.dinner}\n\n*Стоимость:* ${newOrder.total.toLocaleString()}₽`
-    await sendToTelegram(orderMessage, THREADS.waiting)
+    await sendByRules('new_order', orderMessage, telegramSettings)
 
     alert('Заказ отправлен на согласование!')
+  }
+
+  // Добавление бота
+  const addBot = () => {
+    const newBot = {
+      id: 'bot' + Date.now(),
+      name: 'Новый бот ' + (telegramSettings.bots.length + 1),
+      token: '',
+      active: true
+    }
+    setTelegramSettings({
+      ...telegramSettings,
+      bots: [...telegramSettings.bots, newBot]
+    })
+  }
+
+  const removeBot = (botId) => {
+    setTelegramSettings({
+      ...telegramSettings,
+      bots: telegramSettings.bots.filter(b => b.id !== botId),
+      rules: telegramSettings.rules.map(r => r.botId === botId ? { ...r, enabled: false } : r)
+    })
+  }
+
+  const addGroup = () => {
+    const newGroup = {
+      id: 'group' + Date.now(),
+      name: 'Новая группа ' + (telegramSettings.groups.length + 1),
+      chatId: '',
+      threads: { history: '', waiting: '', newUser: '', orders: '' }
+    }
+    setTelegramSettings({
+      ...telegramSettings,
+      groups: [...telegramSettings.groups, newGroup]
+    })
+  }
+
+  const removeGroup = (groupId) => {
+    setTelegramSettings({
+      ...telegramSettings,
+      groups: telegramSettings.groups.filter(g => g.id !== groupId),
+      rules: telegramSettings.rules.map(r => r.groupId === groupId ? { ...r, enabled: false } : r)
+    })
+  }
+
+  const addRule = () => {
+    const newRule = {
+      id: 'rule' + Date.now(),
+      event: 'new_order',
+      botId: telegramSettings.bots[0]?.id || '',
+      groupId: telegramSettings.groups[0]?.id || '',
+      thread: 'waiting',
+      enabled: true
+    }
+    setTelegramSettings({
+      ...telegramSettings,
+      rules: [...telegramSettings.rules, newRule]
+    })
+  }
+
+  const removeRule = (ruleId) => {
+    setTelegramSettings({
+      ...telegramSettings,
+      rules: telegramSettings.rules.filter(r => r.id !== ruleId)
+    })
+  }
+
+  const testTelegram = async (botId, groupId) => {
+    const bot = telegramSettings.bots.find(b => b.id === botId)
+    const group = telegramSettings.groups.find(g => g.id === groupId)
+    if (bot && group) {
+      const success = await sendToTelegram('🧪 *Тестовое сообщение*\nНастройки работают!', bot.token, group.chatId, group.threads.history)
+      alert(success ? 'Тестовое сообщение отправлено!' : 'Ошибка отправки')
+    } else {
+      alert('Выберите бота и группу')
+    }
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
@@ -357,7 +521,12 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }}>
-          {[{ id: 'clients', name: '🏢 Клиенты' }, { id: 'orders', name: '📋 Заказы' }, { id: 'waiting', name: '📥 Ожидание' }].map(t => (
+          {[
+            { id: 'clients', name: '🏢 Клиенты' },
+            { id: 'orders', name: '📋 Заказы' },
+            { id: 'waiting', name: '📥 Ожидание' },
+            { id: 'telegram', name: '📱 Telegram' }
+          ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{
                 padding: '10px 14px', border: 'none', borderRadius: 8,
@@ -400,7 +569,7 @@ function App() {
 
         {tab === 'orders' && (
           <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0 }}>Все заказы</h3>
+            <h3 style={{ marginTop: 0 }}>Все заказы ({orders.length})</h3>
             {orders.map(order => {
               const clientName = clients[order.clientId]?.company || 'Unknown'
               return (
@@ -420,7 +589,7 @@ function App() {
 
         {tab === 'waiting' && (
           <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования</h3>
+            <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования ({orders.filter(o => o.status === 'waiting').length})</h3>
             {orders.filter(o => o.status === 'waiting').map(order => {
               const clientName = clients[order.clientId]?.company || 'Unknown'
               return (
@@ -433,13 +602,19 @@ function App() {
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 'bold', color: '#FF9800' }}>{order.total.toLocaleString()}₽</div>
                       <div style={{ fontSize: 12, color: '#666' }}>
-                        завтрак: {order.meals. breakfast} • обед: {order.meals.lunch} • ужин: {order.meals.dinner}
+                        завтрак: {order.meals.breakfast} • обед: {order.meals.lunch} • ужин: {order.meals.dinner}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
-                    <button onClick={() => setOrders(prev => prev.filter(o => o.id !== order.id))} style={{ flex: 1, padding: '8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✕ Отклонить</button>
+                    <button onClick={() => {
+                      setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))
+                      sendByRules('order_confirmed', `✅ *Заказ подтверждён*\n${clientName}\n${DAYS_RU[order.day]}`, telegramSettings)
+                    }} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
+                    <button onClick={() => {
+                      setOrders(prev => prev.filter(o => o.id !== order.id))
+                      sendByRules('order_cancelled', `❌ *Заказ отменён*\n${clientName}\n${DAYS_RU[order.day]}`, telegramSettings)
+                    }} style={{ flex: 1, padding: '8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✕ Отклонить</button>
                   </div>
                 </div>
               )
@@ -447,6 +622,165 @@ function App() {
             {orders.filter(o => o.status === 'waiting').length === 0 && (
               <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Нет заказов на согласование</div>
             )}
+          </div>
+        )}
+
+        {/* === TELEGRAM === */}
+        {tab === 'telegram' && (
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {[
+                { id: 'bots', name: '🤖 Боты' },
+                { id: 'groups', name: '💬 Группы' },
+                { id: 'rules', name: '📋 Правила' }
+              ].map(t => (
+                <button key={t.id} onClick={() => setTelegramTab(t.id)}
+                  style={{
+                    padding: '8px 12px', border: 'none', borderRadius: 6,
+                    background: telegramTab === t.id ? '#4CAF50' : '#e0e0e0', color: telegramTab === t.id ? '#fff' : '#333',
+                    cursor: 'pointer', fontSize: 13
+                  }}>{t.name}</button>
+              ))}
+            </div>
+
+            {telegramTab === 'bots' && (
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ margin: 0 }}>🤖 Боты ({telegramSettings.bots.length})</h3>
+                  <button onClick={addBot} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
+                </div>
+                {telegramSettings.bots.map(bot => (
+                  <div key={bot.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="checkbox" checked={bot.active} onChange={(e) => {
+                          setTelegramSettings({
+                            ...telegramSettings,
+                            bots: telegramSettings.bots.map(b => b.id === bot.id ? { ...b, active: e.target.checked } : b)
+                          })
+                        }} />
+                        <b>{bot.name}</b>
+                      </label>
+                      <button onClick={() => removeBot(bot.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
+                    </div>
+                    <input type="text" placeholder="Bot Token" value={bot.token}
+                      onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        bots: telegramSettings.bots.map(b => b.id === bot.id ? { ...b, token: e.target.value } : b)
+                      })} style={{ ...inputStyle, marginBottom: 0 }} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {telegramTab === 'groups' && (
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ margin: 0 }}>💬 Группы ({telegramSettings.groups.length})</h3>
+                  <button onClick={addGroup} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
+                </div>
+                {telegramSettings.groups.map(group => (
+                  <div key={group.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <input type="text" placeholder="Название группы" value={group.name}
+                        onChange={(e) => setTelegramSettings({
+                          ...telegramSettings,
+                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, name: e.target.value } : g)
+                        })} style={{ ...inputStyle, marginBottom: 0, width: '60%' }} />
+                      <button onClick={() => removeGroup(group.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
+                    </div>
+                    <input type="text" placeholder="Chat ID" value={group.chatId}
+                      onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, chatId: e.target.value } : g)
+                      })} style={{ ...inputStyle, marginBottom: 8 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input type="text" placeholder="История" value={group.threads.history}
+                        onChange={(e) => setTelegramSettings({
+                          ...telegramSettings,
+                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, history: e.target.value } } : g)
+                        })} style={{ ...inputStyle, marginBottom: 0 }} />
+                      <input type="text" placeholder="Ожидание" value={group.threads.waiting}
+                        onChange={(e) => setTelegramSettings({
+                          ...telegramSettings,
+                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, waiting: e.target.value } } : g)
+                        })} style={{ ...inputStyle, marginBottom: 0 }} />
+                      <input type="text" placeholder="Новый пользователь" value={group.threads.newUser}
+                        onChange={(e) => setTelegramSettings({
+                          ...telegramSettings,
+                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, newUser: e.target.value } } : g)
+                        })} style={{ ...inputStyle, marginBottom: 0 }} />
+                      <input type="text" placeholder="Заявки" value={group.threads.orders}
+                        onChange={(e) => setTelegramSettings({
+                          ...telegramSettings,
+                          groups: telegramSettings.groups.map(g => g.id === group.id ? { ...g, threads: { ...g.threads, orders: e.target.value } } : g)
+                        })} style={{ ...inputStyle, marginBottom: 0 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {telegramTab === 'rules' && (
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ margin: 0 }}>📋 Правила ({telegramSettings.rules.length})</h3>
+                  <button onClick={addRule} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ Добавить</button>
+                </div>
+                {telegramSettings.rules.map(rule => (
+                  <div key={rule.id} style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input type="checkbox" checked={rule.enabled} onChange={(e) => {
+                          setTelegramSettings({
+                            ...telegramSettings,
+                            rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, enabled: e.target.checked } : r)
+                          })
+                        }} />
+                        <b>Правило</b>
+                      </label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => testTelegram(rule.botId, rule.groupId)} style={{ padding: '4px 8px', background: '#FF9800', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Тест</button>
+                        <button onClick={() => removeRule(rule.id)} style={{ padding: '4px 8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕</button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <select value={rule.event} onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, event: e.target.value } : r)
+                      })} style={inputStyle}>
+                        {EVENT_TYPES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                      </select>
+                      <select value={rule.thread} onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, thread: e.target.value } : r)
+                      })} style={inputStyle}>
+                        <option value="history">📜 История</option>
+                        <option value="waiting">📥 Ожидание</option>
+                        <option value="newUser">👤 Новый пользователь</option>
+                        <option value="orders">📋 Заявки</option>
+                      </select>
+                      <select value={rule.botId} onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, botId: e.target.value } : r)
+                      })} style={inputStyle}>
+                        {telegramSettings.bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                      <select value={rule.groupId} onChange={(e) => setTelegramSettings({
+                        ...telegramSettings,
+                        rules: telegramSettings.rules.map(r => r.id === rule.id ? { ...r, groupId: e.target.value } : r)
+                      })} style={inputStyle}>
+                        {telegramSettings.groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13, marginTop: 16 }}>
+              💾 <b>Автосохранение:</b> Все настройки сохраняются автоматически
+            </div>
           </div>
         )}
 
