@@ -6,56 +6,8 @@ const COMPANY_TYPES = [
   { id: 'quarter', name: 'Квартал', emoji: '📅' }
 ]
 
-// Начальные данные клиентов
-const INITIAL_CLIENTS = {
-  'TEST-001': {
-    id: 'TEST-001',
-    company: 'ООО ТехноСтрой',
-    inn: '7812345678',
-    contact: 'Петров Сергей',
-    phone: '+7 (999) 123-45-67',
-    email: 'petrov@tehno.ru',
-    address: 'г. Санкт-Петербург, ул. Новая, д. 10',
-    companyType: 'office',
-    contractDate: '2025-01-15',
-    paymentMethod: 'card',
-    paymentPeriod: 'monthly',
-    active: true,
-    featured: true,
-    discount: 10,
-    staff: { regular: 45, halal: 12, pp: 8, director: 3 },
-    meals: ['breakfast', 'lunch', 'dinner'],
-    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-    adminComment: ''
-  },
-  'TEST-002': {
-    id: 'TEST-002',
-    company: 'ИП Сидоров',
-    inn: '7823456789',
-    contact: 'Сидоров Алексей',
-    phone: '+7 (999) 987-65-43',
-    address: 'г. Санкт-Петербург, пр. Ленина, д. 5',
-    companyType: 'plant',
-    contractDate: '2025-02-01',
-    paymentMethod: 'cash',
-    paymentPeriod: 'daily',
-    active: true,
-    featured: false,
-    discount: 5,
-    staff: { regular: 20, halal: 5, pp: 0, director: 1 },
-    meals: ['lunch', 'dinner'],
-    deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-    adminComment: 'VIP клиент'
-  }
-}
-
-// Начальные заказы
-const INITIAL_ORDERS = [
-  { id: 1, clientId: 'TEST-001', date: '2026-04-02', day: 'tuesday', meals: { breakfast: 45, lunch: 68, dinner: 45 }, status: 'waiting', total: 85400 },
-  { id: 2, clientId: 'TEST-001', date: '2026-04-03', day: 'wednesday', meals: { breakfast: 44, lunch: 67, dinner: 44 }, status: 'waiting', total: 83120 },
-]
+// ID Google таблицы
+const SPREADSHEET_ID = '1VRSHLi1eu7k5cT6lAYWvXbIToTpcMj1rx2saiWwENp4'
 
 // Типы событий для правил
 const EVENT_TYPES = [
@@ -66,27 +18,6 @@ const EVENT_TYPES = [
   { id: 'order_confirmed', name: '✅ Подтверждён заказ', emoji: '✅' },
   { id: 'order_cancelled', name: '❌ Отменён заказ', emoji: '❌' }
 ]
-
-// Дефолтные настройки Telegram
-const DEFAULT_TELEGRAM = {
-  bots: [
-    { id: 'bot1', name: 'Основной бот', token: '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y', active: true }
-  ],
-  groups: [
-    { id: 'group1', name: 'Основная группа', chatId: '-1002583331823', threads: {
-      history: '360',
-      waiting: '362',
-      newUser: '361',
-      orders: '359'
-    }}
-  ],
-  rules: [
-    { id: 'rule1', event: 'new_order', botId: 'bot1', groupId: 'group1', thread: 'waiting', enabled: true },
-    { id: 'rule2', event: 'new_user', botId: 'bot1', groupId: 'group1', thread: 'newUser', enabled: true },
-    { id: 'rule3', event: 'client_comment', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true },
-    { id: 'rule4', event: 'admin_edit', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true }
-  ]
-}
 
 const PRICES = {
   regular: { breakfast: 280, lunch: 420, dinner: 380 },
@@ -130,7 +61,6 @@ const inputStyle = {
   border: '2px solid #e0e0e0', marginBottom: 12, boxSizing: 'border-box', background: '#fff'
 }
 
-
 const labelStyle = {
   fontWeight: '600', display: 'block', marginBottom: 6, fontSize: 13, color: '#333'
 }
@@ -145,40 +75,100 @@ const buttonPrimaryStyle = {
   padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer'
 }
 
-// === ФУНКЦИИ СОХРАНЕНИЯ ===
-const STORAGE_KEYS = {
-  clients: 'food_clients',
-  orders: 'food_orders',
-  telegram: 'food_telegram'
+// === ФУНКЦИИ РАБОТЫ С GOOGLE SHEETS ===
+// Эти функции будут вызывать API через бэкенд
+
+const loadFromSheet = async (sheetName) => {
+  // Заглушка - в реальном приложении здесь будет вызов API
+  // Пока используем localStorage как резерв
+  try {
+    const saved = localStorage.getItem('food_' + sheetName)
+    if (saved) return JSON.parse(saved)
+  } catch (e) {}
+  return null
 }
 
-
-// Загрузка данных
-const loadData = (key, defaultData) => {
+const saveToSheet = async (sheetName, data) => {
+  // Заглушка - в реальном приложении здесь будет вызов API
+  // Пока сохраняем в localStorage
   try {
-    const saved = localStorage.getItem(key)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      // Проверяем, что данные не пустые
-      if (parsed && Object.keys(parsed).length > 0) {
-        return parsed
-      }
-    }
-  } catch (e) {
-    console.log('Load error:', key, e)
-  }
-  return defaultData
-}
-
-// Сохранение данных
-const saveData = (key, data) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data))
+    localStorage.setItem('food_' + sheetName, JSON.stringify(data))
     return true
   } catch (e) {
-    console.log('Save error:', key, e)
     return false
   }
+}
+
+// Загрузка клиентов из Google Sheets
+const loadClients = async () => {
+  const cached = await loadFromSheet('clients')
+  if (cached) return cached
+  
+  // Дефолтные клиенты если нет данных
+  return {
+    'TEST-001': {
+      id: 'TEST-001',
+      company: 'ООО ТехноСтрой',
+      inn: '7812345678',
+      contact: 'Петров Сергей',
+      phone: '+7 (999) 123-45-67',
+      email: 'petrov@tehno.ru',
+      address: 'г. Санкт-Петербург, ул. Новая, д. 10',
+      companyType: 'office',
+      contractDate: '2025-01-15',
+      paymentMethod: 'card',
+      paymentPeriod: 'monthly',
+      active: true,
+      featured: true,
+      discount: 10,
+      staff: { regular: 45, halal: 12, pp: 8, director: 3 },
+      meals: ['breakfast', 'lunch', 'dinner'],
+      deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
+      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
+      adminComment: ''
+    },
+    'TEST-002': {
+      id: 'TEST-002',
+      company: 'ИП Сидоров',
+      inn: '7823456789',
+      contact: 'Сидоров Алексей',
+      phone: '+7 (999) 987-65-43',
+      address: 'г. Санкт-Петербург, пр. Ленина, д. 5',
+      companyType: 'plant',
+      contractDate: '2025-02-01',
+      paymentMethod: 'cash',
+      paymentPeriod: 'daily',
+      active: true,
+      featured: false,
+      discount: 5,
+      staff: { regular: 20, halal: 5, pp: 0, director: 1 },
+      meals: ['lunch', 'dinner'],
+      deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
+      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
+      adminComment: 'VIP клиент'
+    }
+  }
+}
+
+// Дефолтные настройки Telegram
+const DEFAULT_TELEGRAM = {
+  bots: [
+    { id: 'bot1', name: 'Основной бот', token: '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y', active: true }
+  ],
+  groups: [
+    { id: 'group1', name: 'Основная группа', chatId: '-1002583331823', threads: {
+      history: '360',
+      waiting: '362',
+      newUser: '361',
+      orders: '359'
+    }}
+  ],
+  rules: [
+    { id: 'rule1', event: 'new_order', botId: 'bot1', groupId: 'group1', thread: 'waiting', enabled: true },
+    { id: 'rule2', event: 'new_user', botId: 'bot1', groupId: 'group1', thread: 'newUser', enabled: true },
+    { id: 'rule3', event: 'client_comment', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true },
+    { id: 'rule4', event: 'admin_edit', botId: 'bot1', groupId: 'group1', thread: 'history', enabled: true }
+  ]
 }
 
 // Отправка в Telegram
@@ -220,7 +210,7 @@ function App() {
   const [contractNumber, setContractNumber] = useState('')
   const [loginError, setLoginError] = useState('')
   const [currentClient, setCurrentClient] = useState(null)
-  const [clients, setClients] = useState(() => loadData(STORAGE_KEYS.clients, INITIAL_CLIENTS))
+  const [clients, setClients] = useState({})
   const [editingClient, setEditingClient] = useState(null)
   const [companyType, setCompanyType] = useState('office')
   const [selectedMeals, setSelectedMeals] = useState([])
@@ -234,25 +224,48 @@ function App() {
   })
 
   // Настройки Telegram
-  const [telegramSettings, setTelegramSettings] = useState(() => loadData(STORAGE_KEYS.telegram, DEFAULT_TELEGRAM))
+  const [telegramSettings, setTelegramSettings] = useState(DEFAULT_TELEGRAM)
   const [telegramTab, setTelegramTab] = useState('bots')
 
   // Заказы
-  const [orders, setOrders] = useState(() => loadData(STORAGE_KEYS.orders, INITIAL_ORDERS))
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Загрузка данных при старте
+  useEffect(() => {
+    const loadData = async () => {
+      const clientsData = await loadClients()
+      setClients(clientsData)
+      
+      const ordersData = await loadFromSheet('orders')
+      setOrders(ordersData || [])
+      
+      const telegramData = await loadFromSheet('telegram')
+      setTelegramSettings(telegramData || DEFAULT_TELEGRAM)
+      
+      setLoading(false)
+    }
+    loadData()
+  }, [])
 
   // Сохранение при изменении
   useEffect(() => {
-    saveData(STORAGE_KEYS.clients, clients)
-  }, [clients])
-
-
-  useEffect(() => {
-    saveData(STORAGE_KEYS.orders, orders)
-  }, [orders])
+    if (!loading && Object.keys(clients).length > 0) {
+      saveToSheet('clients', clients)
+    }
+  }, [clients, loading])
 
   useEffect(() => {
-    saveData(STORAGE_KEYS.telegram, telegramSettings)
-  }, [telegramSettings])
+    if (!loading && orders.length > 0) {
+      saveToSheet('orders', orders)
+    }
+  }, [orders, loading])
+
+  useEffect(() => {
+    if (!loading) {
+      saveToSheet('telegram', telegramSettings)
+    }
+  }, [telegramSettings, loading])
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
@@ -361,7 +374,6 @@ function App() {
 
     setOrders(prev => [...prev, newOrder])
 
-
     const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n*Завтрак:* ${newOrder.meals.breakfast}\n*Обед:* ${newOrder.meals.lunch}\n*Ужин:* ${newOrder.meals.dinner}\n\n*Стоимость:* ${newOrder.total.toLocaleString()}₽`
     await sendByRules('new_order', orderMessage, telegramSettings)
 
@@ -450,6 +462,15 @@ function App() {
 
   const todayOrders = orders.filter(o => o.status === 'waiting')
 
+  if (loading) {
+    return (
+      <div style={{ padding: 20, textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
+        <div>Загрузка данных...</div>
+      </div>
+    )
+  }
+
   // === ВХОД ===
   if (!currentClient && view !== 'admin') {
     return (
@@ -470,6 +491,9 @@ function App() {
           <button onClick={() => navigate('new')} style={{
             ...buttonPrimaryStyle, background: '#fff', color: '#1976D2', border: '2px solid #1976D2', marginTop: 12
           }}>📝 Оставить заявку</button>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#666' }}>
+          📊 <a href="https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit" target="_blank" style={{ color: '#1976D2' }}>База данных</a>
         </div>
       </div>
     )
@@ -559,8 +583,8 @@ function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 13 }}>
                   <div>Скидка: <b>{c.discount}%</b></div>
                   <div>Оплата: <b>{getPaymentMethodName(c.paymentMethod)}</b></div>
-                  <div>Менеджер: <b>{c.manager.name}</b></div>
-                  <div>Тел: <b>{c.manager.phone}</b></div>
+                  <div>Менеджер: <b>{c.manager?.name || '-'}</b></div>
+                  <div>Тел: <b>{c.manager?.phone || '-'}</b></div>
                 </div>
               </div>
             ))}
@@ -779,7 +803,7 @@ function App() {
             )}
 
             <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13, marginTop: 16 }}>
-              💾 <b>Автосохранение:</b> Все настройки сохраняются автоматически
+              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть таблицу</a>
             </div>
           </div>
         )}
