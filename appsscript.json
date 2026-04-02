@@ -1,0 +1,402 @@
+// ============================================
+// Google Apps Script - API для Питание СПБ
+// ============================================
+
+const SPREADSHEET_ID = '1VRSHLi1eu7k5cT6lAYWvXbIToTpcMj1rx2saiWwENp4';
+
+// Названия листов
+const SHEETS = {
+  CLIENTS: 'Клиенты',
+  ORDERS: 'Заказы',
+  SETTINGS: 'Настройки',
+  HISTORY: 'История'
+};
+
+// === API ENDPOINTS ===
+
+function doGet(e) {
+  const action = e.parameter.action;
+  const callback = e.parameter.callback;
+  
+  let result;
+  
+  try {
+    switch(action) {
+      case 'getClients':
+        result = getClients();
+        break;
+      case 'getClient':
+        result = getClient(e.parameter.id);
+        break;
+      case 'saveClient':
+        result = saveClient(JSON.parse(e.parameter.data));
+        break;
+      case 'deleteClient':
+        result = deleteClient(e.parameter.id);
+        break;
+      case 'getOrders':
+        result = getOrders(e.parameter.clientId);
+        break;
+      case 'saveOrder':
+        result = saveOrder(JSON.parse(e.parameter.data));
+        break;
+      case 'updateOrderStatus':
+        result = updateOrderStatus(e.parameter.id, e.parameter.status);
+        break;
+      case 'getSettings':
+        result = getSettings();
+        break;
+      case 'saveSettings':
+        result = saveSettings(JSON.parse(e.parameter.data));
+        break;
+      case 'addHistory':
+        result = addHistory(JSON.parse(e.parameter.data));
+        break;
+      case 'getHistory':
+        result = getHistory();
+        break;
+      default:
+        result = { success: false, error: 'Unknown action' };
+    }
+  } catch (err) {
+    result = { success: false, error: err.message };
+  }
+  
+  // JSONP support
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + JSON.stringify(result) + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const action = e.parameter.action;
+  const postData = JSON.parse(e.postData.contents);
+  let result;
+  
+  try {
+    switch(action) {
+      case 'saveClient':
+        result = saveClient(postData);
+        break;
+      case 'saveOrder':
+        result = saveOrder(postData);
+        break;
+      case 'saveSettings':
+        result = saveSettings(postData);
+        break;
+      case 'addHistory':
+        result = addHistory(postData);
+        break;
+      default:
+        result = { success: false, error: 'Unknown action' };
+    }
+  } catch (err) {
+    result = { success: false, error: err.message };
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// === CLIENTS ===
+
+function getClients() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.CLIENTS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const clients = {};
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    
+    const client = {};
+    headers.forEach((h, idx) => {
+      client[h] = row[idx];
+    });
+    
+    // Преобразуем staff из строки в объект
+    if (client.regular !== undefined) {
+      client.staff = {
+        regular: parseInt(client.regular) || 0,
+        halal: parseInt(client.halal) || 0,
+        pp: parseInt(client.pp) || 0,
+        director: parseInt(client.director) || 0
+      };
+    }
+    
+    // Преобразуем meals
+    if (client.meals) {
+      client.meals = client.meals.split(',').map(m => m.trim());
+    }
+    
+    clients[client.ID] = client;
+  }
+  
+  return { success: true, data: clients };
+}
+
+function getClient(id) {
+  const clients = getClients();
+  return { success: true, data: clients.data[id] || null };
+}
+
+function saveClient(client) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.CLIENTS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  // Ищем существующую строку
+  let rowIndex = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == client.id) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  
+  // Подготовка данных
+  const rowData = [
+    client.id || '',
+    client.company || '',
+    client.inn || '',
+    client.contact || '',
+    client.phone || '',
+    client.email || '',
+    client.address || '',
+    client.companyType || '',
+    client.contractDate || '',
+    client.paymentMethod || '',
+    client.paymentPeriod || '',
+    client.active ? 'TRUE' : 'FALSE',
+    client.featured ? 'TRUE' : 'FALSE',
+    client.discount || 0,
+    client.staff?.regular || 0,
+    client.staff?.halal || 0,
+    client.staff?.pp || 0,
+    client.staff?.director || 0,
+    client.manager?.name || '',
+    client.manager?.phone || '',
+    client.adminComment || ''
+  ];
+  
+  if (rowIndex > 0) {
+    // Обновляем
+    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    // Добавляем новую строку
+    sheet.appendRow(rowData);
+  }
+  
+  return { success: true, id: client.id };
+}
+
+function deleteClient(id) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.CLIENTS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == id) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Client not found' };
+}
+
+// === ORDERS ===
+
+function getOrders(clientId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.ORDERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const orders = [];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    
+    const order = {};
+    headers.forEach((h, idx) => {
+      order[h] = row[idx];
+    });
+    
+    if (!clientId || order['Клиент ID'] == clientId) {
+      orders.push(order);
+    }
+  }
+  
+  return { success: true, data: orders };
+}
+
+function saveOrder(order) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.ORDERS);
+  
+  const rowData = [
+    order.id || Date.now(),
+    order.clientId || '',
+    order.date || new Date().toISOString().split('T')[0],
+    order.day || '',
+    order.meals?.breakfast || 0,
+    order.meals?.lunch || 0,
+    order.meals?.dinner || 0,
+    order.status || 'waiting',
+    order.total || 0
+  ];
+  
+  // Ищем существующую строку
+  const data = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == order.id) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (rowIndex > 0) {
+    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+  
+  return { success: true, id: order.id };
+}
+
+function updateOrderStatus(id, status) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.ORDERS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == id) {
+      sheet.getRange(i + 1, 8).setValue(status); // Статус в колонке H
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Order not found' };
+}
+
+// === SETTINGS ===
+
+function getSettings() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.SETTINGS);
+  const data = sheet.getDataRange().getValues();
+  const settings = {};
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) {
+      settings[data[i][1]] = data[i][2];
+    }
+  }
+  
+  // Пробуем получить настройки Telegram из JSON
+  try {
+    const telegramData = getTelegramFromSheet();
+    if (telegramData) {
+      settings.telegram = telegramData;
+    }
+  } catch(e) {}
+  
+  return { success: true, data: settings };
+}
+
+function getTelegramFromSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.SETTINGS);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][1] === 'telegram_json') {
+      return JSON.parse(data[i][2]);
+    }
+  }
+  return null;
+}
+
+function saveSettings(settings) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.SETTINGS);
+  
+  // Сохраняем настройки Telegram как JSON
+  if (settings.telegram) {
+    const data = sheet.getDataRange().getValues();
+    let found = false;
+    
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1] === 'telegram_json') {
+        sheet.getRange(i + 1, 3).setValue(JSON.stringify(settings.telegram));
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      sheet.appendRow(['Настройки', 'telegram_json', JSON.stringify(settings.telegram)]);
+    }
+  }
+  
+  return { success: true };
+}
+
+// === HISTORY ===
+
+function addHistory(event) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.HISTORY);
+  
+  const rowData = [
+    Date.now(),
+    new Date().toISOString(),
+    event.event || '',
+    event.client || '',
+    event.details || ''
+  ];
+  
+  sheet.appendRow(rowData);
+  
+  return { success: true };
+}
+
+function getHistory() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEETS.HISTORY);
+  const data = sheet.getDataRange().getValues();
+  const history = [];
+  
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0]) {
+      history.push({
+        id: data[i][0],
+        date: data[i][1],
+        event: data[i][2],
+        client: data[i][3],
+        details: data[i][4]
+      });
+    }
+  }
+  
+  return { success: true, data: history };
+}
+
+// === ТЕСТОВЫЙ ЗАПРОС ===
+function testAPI() {
+  return {
+    success: true,
+    message: 'API работает!',
+    spreadsheet: SPREADSHEET_ID,
+    timestamp: new Date().toISOString()
+  };
+}
