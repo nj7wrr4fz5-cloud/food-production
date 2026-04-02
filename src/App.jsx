@@ -13,12 +13,12 @@ const SPREADSHEET_ID = '1VRSHLi1eu7k5cT6lAYWvXbIToTpcMj1rx2saiWwENp4'
 const BOT_TOKEN = '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y'
 const GROUP_CHAT_ID = '-1002583331823'
 
-// ID топиков (thread IDs)
+// ID топиков (ЧИСЛА!)
 const THREADS = {
-  waiting: '360',      // Ожидание
-  newUser: '361',      // Новый пользователь
-  history: '362',      // История
-  orders: '359'        // Заявки
+  waiting: 360,      // Ожидание
+  newUser: 361,      // Новый пользователь
+  history: 362,       // История
+  orders: 359         // Заявки
 }
 
 const EVENT_TYPES = [
@@ -96,10 +96,11 @@ const sendToTelegram = async (message, threadId) => {
         chat_id: GROUP_CHAT_ID,
         text: message,
         parse_mode: 'Markdown',
-        message_thread_id: threadId
+        message_thread_id: Number(threadId)  // ЧИСЛО!
       })
     })
     const data = await response.json()
+    console.log('Telegram response:', data)
     return data.ok
   } catch (err) {
     console.log('Telegram error:', err)
@@ -117,6 +118,7 @@ const sendByEvent = async (eventType, message) => {
     order_cancelled: THREADS.orders
   }
   const threadId = threadMap[eventType]
+  console.log('Sending to thread:', threadId, 'event:', eventType)
   return await sendToTelegram(message, threadId)
 }
 
@@ -392,9 +394,23 @@ function App() {
   }
 
   const testTelegram = async () => {
-    const message = `🧪 *Тестовое сообщение*\n\nНастройки Telegram работают!\n\n⏰ ${new Date().toLocaleString('ru-RU')}`
-    const success = await sendToTelegram(message, THREADS.history)
-    alert(success ? 'Тестовое сообщение отправлено!' : 'Ошибка отправки')
+    const results = []
+    
+    // Тест всех топиков
+    const tests = [
+      { id: THREADS.waiting, name: 'Ожидание' },
+      { id: THREADS.newUser, name: 'Новый пользователь' },
+      { id: THREADS.history, name: 'История' },
+      { id: THREADS.orders, name: 'Заявки' }
+    ]
+
+    for (const t of tests) {
+      const msg = `🧪 *Тест ${t.name}*\n\nID топика: ${t.id}\n⏰ ${new Date().toLocaleString('ru-RU')}`
+      const ok = await sendToTelegram(msg, t.id)
+      results.push(`${t.name}: ${ok ? '✅' : '❌'}`)
+    }
+
+    alert('Результаты:\n' + results.join('\n'))
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
@@ -435,7 +451,7 @@ function App() {
           }}>📝 Оставить заявку</button>
         </div>
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#666' }}>
-          📊 <a href="https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit" target="_blank" style={{ color: '#1976D2' }}>База данных</a>
+          📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>База данных</a>
         </div>
       </div>
     )
@@ -620,12 +636,16 @@ function App() {
             
             <div style={{ padding: 12, background: '#E8F5E9', borderRadius: 8, marginBottom: 12 }}>
               <div style={{ fontWeight: '600', marginBottom: 8 }}>🤖 Бот</div>
-              <div style={{ fontSize: 13 }}>Token: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{BOT_TOKEN.slice(0, 15)}...</code></div>
-              <div style={{ fontSize: 13 }}>Статус: <span style={{ color: '#4CAF50' }}>✅ Подключён</span></div>
+              <div style={{ fontSize: 13 }}>Имя: <b>Shyrik</b></div>
+              <div style={{ fontSize: 13 }}>Username: <b>@Sgrer01_bot</b></div>
+              <div style={{ fontSize: 13 }}>ID: <b>6706048508</b></div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Статус: <span style={{ color: '#4CAF50' }}>✅ Работает</span></div>
             </div>
 
             <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, marginBottom: 12 }}>
               <div style={{ fontWeight: '600', marginBottom: 8 }}>💬 Группа</div>
+              <div style={{ fontSize: 13 }}>Название: <b>Тест группа</b></div>
+              <div style={{ fontSize: 13 }}>Username: <b>@test_shyrik</b></div>
               <div style={{ fontSize: 13 }}>Chat ID: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{GROUP_CHAT_ID}</code></div>
               <div style={{ fontSize: 13 }}>Ссылка: <a href="https://t.me/test_shyrik/223" target="_blank" style={{ color: '#1976D2' }}>t.me/test_shyrik/223</a></div>
             </div>
@@ -641,10 +661,10 @@ function App() {
             </div>
 
             <button onClick={testTelegram} style={{ ...buttonPrimaryStyle, background: '#FF9800', marginBottom: 12 }}>
-              🧪 Тестовое сообщение
+              🧪 Тест всех топиков
             </button>
 
-            <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8 }}>
+            <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
               <div style={{ fontWeight: '600', marginBottom: 8 }}>📊 Ссылки на топики</div>
               <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <a href="https://t.me/test_shyrik/360" target="_blank" style={{ color: '#1976D2' }}>📥 Ожидание</a>
@@ -655,7 +675,7 @@ function App() {
             </div>
 
             <div style={{ marginTop: 16, padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
-              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
+              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} → target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
             </div>
           </div>
         )}
