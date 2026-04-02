@@ -15,20 +15,11 @@ const GROUP_CHAT_ID = '-1002583331823'
 
 // ID топиков (ЧИСЛА!)
 const THREADS = {
-  waiting: 360,      // Ожидание
-  newUser: 361,      // Новый пользователь
-  history: 362,       // История
-  orders: 359         // Заявки
+  waiting: 360,
+  newUser: 361,
+  history: 362,
+  orders: 359
 }
-
-const EVENT_TYPES = [
-  { id: 'new_order', name: '📥 Новый заказ', emoji: '📋' },
-  { id: 'new_user', name: '👤 Новая заявка', emoji: '👤' },
-  { id: 'client_comment', name: '💬 Комментарий клиента', emoji: '💬' },
-  { id: 'admin_edit', name: '📝 Изменение в админке', emoji: '📝' },
-  { id: 'order_confirmed', name: '✅ Подтверждён заказ', emoji: '✅' },
-  { id: 'order_cancelled', name: '❌ Отменён заказ', emoji: '❌' }
-]
 
 const PRICES = {
   regular: { breakfast: 280, lunch: 420, dinner: 380 },
@@ -96,7 +87,7 @@ const sendToTelegram = async (message, threadId) => {
         chat_id: GROUP_CHAT_ID,
         text: message,
         parse_mode: 'Markdown',
-        message_thread_id: Number(threadId)  // ЧИСЛО!
+        message_thread_id: Number(threadId)
       })
     })
     const data = await response.json()
@@ -118,7 +109,6 @@ const sendByEvent = async (eventType, message) => {
     order_cancelled: THREADS.orders
   }
   const threadId = threadMap[eventType]
-  console.log('Sending to thread:', threadId, 'event:', eventType)
   return await sendToTelegram(message, threadId)
 }
 
@@ -159,26 +149,6 @@ const DEFAULT_CLIENTS = {
     deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
     manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'VIP клиент'
   },
-  'TEST-003': {
-    id: 'TEST-003', company: 'АО Невский завод', inn: '7813000111', contact: 'Смирнова Екатерина',
-    phone: '+7 (999) 111-22-33', email: 'smirnova@nevskiy.ru', address: 'г. Санкт-Петербург, ул. Металлистов, д. 7',
-    companyType: 'office', contractDate: '2024-11-20', paymentMethod: 'account', paymentPeriod: 'monthly',
-    active: true, featured: false, discount: 7,
-    staff: { regular: 60, halal: 0, pp: 15, director: 10 },
-    meals: ['breakfast', 'lunch', 'dinner'],
-    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Мария', phone: '+7 (999) 000-33-44' }, adminComment: 'Требует доставку к 12:00'
-  },
-  'TEST-004': {
-    id: 'TEST-004', company: 'ООО Северный берег', inn: '7814567890', contact: 'Козлов Дмитрий',
-    phone: '+7 (999) 222-33-44', email: 'kozlov@severbereg.ru', address: 'г. Санкт-Петербург, наб. реки Фонтанки, д. 28',
-    companyType: 'quarter', contractDate: '2024-10-01', paymentMethod: 'card', paymentPeriod: 'monthly',
-    active: true, featured: true, discount: 15,
-    staff: { regular: 120, halal: 30, pp: 20, director: 10 },
-    meals: ['breakfast', 'lunch', 'dinner'],
-    deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'VIP - приоритетная доставка'
-  },
   'DEMO': {
     id: 'DEMO', company: 'Демо клиент', inn: '0000000000', contact: 'Тестовый пользователь',
     phone: '+7 (999) 000-00-00', email: 'demo@test.ru', address: 'Тестовый адрес',
@@ -210,11 +180,9 @@ function App() {
     paymentMethod: 'card', paymentPeriod: 'monthly'
   })
 
-  // Заказы
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Загрузка данных
   useEffect(() => {
     const loadData = () => {
       const savedClients = loadFromStorage('clients')
@@ -228,7 +196,6 @@ function App() {
     loadData()
   }, [])
 
-  // Сохранение при изменении
   useEffect(() => {
     if (!loading && Object.keys(clients).length > 0) {
       saveToStorage('clients', clients)
@@ -310,11 +277,6 @@ function App() {
       if (oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
       if (oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
       if (oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
-      if (oldClient.paymentMethod !== editingClient.paymentMethod) changes.push(`оплата: ${oldClient.paymentMethod} → ${editingClient.paymentMethod}`)
-      if (oldClient.paymentPeriod !== editingClient.paymentPeriod) changes.push(`период: ${oldClient.paymentPeriod} → ${editingClient.paymentPeriod}`)
-      if (oldClient.address !== editingClient.address) changes.push(`адрес: ${oldClient.address} → ${editingClient.address}`)
-      if (oldClient.manager?.name !== editingClient.manager?.name) changes.push(`менеджер: ${oldClient.manager?.name} → ${editingClient.manager?.name}`)
-      if (oldClient.adminComment !== editingClient.adminComment) changes.push(`комментарий: "${editingClient.adminComment}"`)
 
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
 
@@ -357,25 +319,11 @@ function App() {
   const addNewClient = () => {
     const newId = 'NEW-' + Date.now().toString().slice(-4).toUpperCase()
     const newClient = {
-      id: newId,
-      company: '',
-      inn: '',
-      contact: '',
-      phone: '',
-      email: '',
-      address: '',
-      companyType: 'office',
-      contractDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'card',
-      paymentPeriod: 'monthly',
-      active: true,
-      featured: false,
-      discount: 0,
-      staff: { regular: 0, halal: 0, pp: 0, director: 0 },
-      meals: ['lunch'],
-      deliveryTime: { lunch: '12:00-13:00' },
-      manager: { name: 'Анна', phone: '+7 (999) 000-11-22' },
-      adminComment: ''
+      id: newId, company: '', inn: '', contact: '', phone: '', email: '', address: '',
+      companyType: 'office', contractDate: new Date().toISOString().split('T')[0],
+      paymentMethod: 'card', paymentPeriod: 'monthly', active: true, featured: false, discount: 0,
+      staff: { regular: 0, halal: 0, pp: 0, director: 0 }, meals: ['lunch'],
+      deliveryTime: { lunch: '12:00-13:00' }, manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: ''
     }
     setEditingClient(newClient)
   }
@@ -395,8 +343,6 @@ function App() {
 
   const testTelegram = async () => {
     const results = []
-    
-    // Тест всех топиков
     const tests = [
       { id: THREADS.waiting, name: 'Ожидание' },
       { id: THREADS.newUser, name: 'Новый пользователь' },
@@ -647,7 +593,6 @@ function App() {
               <div style={{ fontSize: 13 }}>Название: <b>Тест группа</b></div>
               <div style={{ fontSize: 13 }}>Username: <b>@test_shyrik</b></div>
               <div style={{ fontSize: 13 }}>Chat ID: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{GROUP_CHAT_ID}</code></div>
-              <div style={{ fontSize: 13 }}>Ссылка: <a href="https://t.me/test_shyrik/223" target="_blank" style={{ color: '#1976D2' }}>t.me/test_shyrik/223</a></div>
             </div>
 
             <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 12 }}>
@@ -675,7 +620,7 @@ function App() {
             </div>
 
             <div style={{ marginTop: 16, padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
-              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} → target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
+              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
             </div>
           </div>
         )}
@@ -695,12 +640,6 @@ function App() {
               <label style={labelStyle}>Телефон:</label>
               <input type="text" value={editingClient.phone} onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})} style={inputStyle} />
 
-              <label style={labelStyle}>Email:</label>
-              <input type="text" value={editingClient.email || ''} onChange={(e) => setEditingClient({...editingClient, email: e.target.value})} style={inputStyle} />
-
-              <label style={labelStyle}>Адрес:</label>
-              <input type="text" value={editingClient.address} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} />
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" checked={editingClient.active} onChange={(e) => setEditingClient({...editingClient, active: e.target.checked})} />
@@ -714,40 +653,6 @@ function App() {
 
               <label style={labelStyle}>Скидка (%):</label>
               <input type="number" value={editingClient.discount} onChange={(e) => setEditingClient({...editingClient, discount: parseInt(e.target.value) || 0})} style={inputStyle} />
-
-              <label style={labelStyle}>Тип предприятия:</label>
-              <select value={editingClient.companyType} onChange={(e) => setEditingClient({...editingClient, companyType: e.target.value})} style={inputStyle}>
-                {COMPANY_TYPES.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
-              </select>
-
-              <label style={labelStyle}>Оплата:</label>
-              <select value={editingClient.paymentMethod} onChange={(e) => setEditingClient({...editingClient, paymentMethod: e.target.value})} style={inputStyle}>
-                {PAYMENT_METHODS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-
-              <label style={labelStyle}>Период:</label>
-              <select value={editingClient.paymentPeriod} onChange={(e) => setEditingClient({...editingClient, paymentPeriod: e.target.value})} style={inputStyle}>
-                {PAYMENT_PERIODS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-
-              <label style={labelStyle}>Приёмы:</label>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                {MEALS.map(m => (
-                  <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <input type="checkbox" checked={editingClient.meals?.includes(m.id)} onChange={(e) => {
-                      const meals = editingClient.meals || []
-                      setEditingClient({...editingClient, meals: e.target.checked ? [...meals, m.id] : meals.filter(x => x !== m.id)})
-                    }} />
-                    {m.name}
-                  </label>
-                ))}
-              </div>
-
-              <label style={labelStyle}>Менеджер:</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                <input type="text" placeholder="Имя" value={editingClient.manager?.name || ''} onChange={(e) => setEditingClient({...editingClient, manager: {...editingClient.manager, name: e.target.value}})} style={inputStyle} />
-                <input type="text" placeholder="Тел" value={editingClient.manager?.phone || ''} onChange={(e) => setEditingClient({...editingClient, manager: {...editingClient.manager, phone: e.target.value}})} style={inputStyle} />
-              </div>
 
               <label style={labelStyle}>Комментарий клиенту:</label>
               <textarea value={editingClient.adminComment || ''} onChange={(e) => setEditingClient({...editingClient, adminComment: e.target.value})} style={{ ...inputStyle, height: 80 }} />
