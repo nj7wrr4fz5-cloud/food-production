@@ -83,6 +83,12 @@ const saveToStorage = (key, data) => {
   } catch (e) { return false }
 }
 
+const DEFAULT_MANAGERS = [
+  { id: 1, name: 'Анна', phone: '+7 (999) 000-11-22', telegram: '@anna_manager' },
+  { id: 2, name: 'Мария', phone: '+7 (999) 000-33-44', telegram: '@maria_manager' },
+  { id: 3, name: 'Иван', phone: '+7 (999) 000-55-66', telegram: '@ivan_manager' }
+]
+
 const DEFAULT_CLIENTS = {
   'TEST-001': {
     id: 'TEST-001', company: 'ООО ТехноСтрой', inn: '7812345678', contact: 'Петров Сергей',
@@ -92,7 +98,7 @@ const DEFAULT_CLIENTS = {
     staff: { regular: 45, halal: 12, pp: 8, director: 3 },
     meals: ['breakfast', 'lunch', 'dinner'],
     deliveryTime: { breakfast: '07:30-08:30', lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: ''
+    managerId: 1, adminComment: ''
   },
   'TEST-002': {
     id: 'TEST-002', company: 'ИП Сидоров', inn: '7823456789', contact: 'Сидоров Алексей',
@@ -102,17 +108,7 @@ const DEFAULT_CLIENTS = {
     staff: { regular: 20, halal: 5, pp: 0, director: 1 },
     meals: ['lunch', 'dinner'],
     deliveryTime: { lunch: '12:00-13:00', dinner: '17:30-18:30' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'VIP клиент'
-  },
-  'DEMO': {
-    id: 'DEMO', company: 'Демо клиент', inn: '0000000000', contact: 'Тестовый пользователь',
-    phone: '+7 (999) 000-00-00', email: 'demo@test.ru', address: 'Тестовый адрес',
-    companyType: 'office', contractDate: '2025-01-01', paymentMethod: 'cash', paymentPeriod: 'daily',
-    active: true, featured: false, discount: 0,
-    staff: { regular: 10, halal: 0, pp: 0, director: 5 },
-    meals: ['lunch'],
-    deliveryTime: { lunch: '12:00-13:00' },
-    manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: 'Тестовый аккаунт'
+    managerId: 2, adminComment: 'VIP клиент'
   }
 }
 
@@ -132,6 +128,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [clients, setClients] = useState({})
   const [users, setUsers] = useState({})
+  const [managers, setManagers] = useState([])
   const [editingClient, setEditingClient] = useState(null)
   const [companyType, setCompanyType] = useState('office')
   const [selectedMeals, setSelectedMeals] = useState([])
@@ -153,7 +150,6 @@ function App() {
   
   const [recoveryMode, setRecoveryMode] = useState(false)
   const [recoveryContract, setRecoveryContract] = useState('')
-  const [recoverySent, setRecoverySent] = useState(false)
 
   useEffect(() => {
     const loadData = () => {
@@ -172,11 +168,13 @@ function App() {
       const savedUsers = loadFromStorage('users')
       setUsers(savedUsers || DEFAULT_USERS)
       
+      const savedManagers = loadFromStorage('managers')
+      setManagers(savedManagers || DEFAULT_MANAGERS)
+      
       setLoading(false)
     }
     loadData()
   }, [])
-
 
   useEffect(() => {
     if (!loading && Object.keys(clients).length > 0) {
@@ -207,6 +205,12 @@ function App() {
       saveToStorage('users', users)
     }
   }, [users, loading])
+
+  useEffect(() => {
+    if (!loading && managers.length > 0) {
+      saveToStorage('managers', managers)
+    }
+  }, [managers, loading])
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
@@ -262,7 +266,6 @@ function App() {
         const newPassword = 'P' + Math.random().toString(36).slice(-6).toUpperCase()
         const message = `🔐 *Восстановление пароля*\n\n*Компания:* ${clients[upperContract].company}\n*Договор:* ${upperContract}\n*Новый пароль:* ${newPassword}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
         await sendToTelegram(activeBot, message, threads.history)
-        setRecoverySent(true)
         alert(`Запрос отправлен! Новый пароль будет выслан в группу Telegram.`)
       } else {
         alert('Настройте бота для отправки сообщений')
@@ -302,13 +305,11 @@ function App() {
     if (editingClient) {
       const oldClient = clients[editingClient.id]
       const changes = []
-
       if (oldClient && oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
       if (oldClient && oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
       if (oldClient && oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
 
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
-
 
       if (changes.length > 0) {
         const activeBot = bots.find(b => b.active)
@@ -331,7 +332,8 @@ function App() {
       day: selectedDay,
       meals: { breakfast: 0, lunch: 0, dinner: 0 },
       status: 'waiting',
-      total: 0
+      total: 0,
+      guestComment: ''
     }
 
     selectedMeals.forEach(m => {
@@ -343,10 +345,9 @@ function App() {
 
     setOrders(prev => [...prev, newOrder])
 
-
     const activeBot = bots.find(b => b.active)
     if (activeBot) {
-      const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
+      const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Адрес:* ${currentClient.address}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
       await sendToTelegram(activeBot, orderMessage, threads.waiting)
     }
 
@@ -360,7 +361,8 @@ function App() {
       companyType: 'office', contractDate: new Date().toISOString().split('T')[0],
       paymentMethod: 'card', paymentPeriod: 'monthly', active: true, featured: false, discount: 0,
       staff: { regular: 0, halal: 0, pp: 0, director: 0 }, meals: ['lunch'],
-      deliveryTime: { lunch: '12:00-13:00' }, manager: { name: 'Анна', phone: '+7 (999) 000-11-22' }, adminComment: ''
+      deliveryTime: { lunch: '12:00-13:00' },
+      managerId: 1, adminComment: ''
     }
     setEditingClient(newClient)
   }
@@ -407,6 +409,22 @@ function App() {
         delete updated[userId]
         return updated
       })
+    }
+  }
+
+  const addNewManager = () => {
+    const newId = Date.now()
+    const newManager = { id: newId, name: 'Новый менеджер', phone: '', telegram: '' }
+    setManagers(prev => [...prev, newManager])
+  }
+
+  const saveManager = (managerId, field, value) => {
+    setManagers(prev => prev.map(m => m.id === managerId ? { ...m, [field]: value } : m))
+  }
+
+  const deleteManager = (managerId) => {
+    if (confirm('Удалить менеджера?')) {
+      setManagers(prev => prev.filter(m => m.id !== managerId))
     }
   }
 
@@ -494,9 +512,10 @@ function App() {
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
+  const getManagerName = (id) => managers.find(m => m.id === id)?.name || 'Не назначен'
+  const getManager = (id) => managers.find(m => m.id === id)
 
   const todayOrders = orders.filter(o => o.status === 'waiting')
-  
   const isAdmin = currentUser?.role === 'admin'
   const isOperator = currentUser?.role === 'operator'
 
@@ -524,7 +543,7 @@ function App() {
               <input type="text" placeholder="TEST-001" value={recoveryContract}
                 onChange={(e) => setRecoveryContract(e.target.value)} style={inputStyle} />
               <button onClick={handleRecovery} style={buttonPrimaryStyle}>🔐 Восстановить пароль</button>
-              <button onClick={() => { setRecoveryMode(false); setRecoveryContract(''); setRecoverySent(false) }} style={{
+              <button onClick={() => { setRecoveryMode(false); setRecoveryContract('') }} style={{
                 ...buttonPrimaryStyle, background: '#fff', color: '#666', border: '1px solid #ccc', marginTop: 12
               }}>← Назад к входу</button>
             </>
@@ -603,6 +622,8 @@ function App() {
             { id: 'clients', name: '🏢 Клиенты' },
             { id: 'orders', name: '📋 Заказы' },
             { id: 'waiting', name: '📥 Ожидание' },
+            { id: 'reports', name: '📈 Отчёты' },
+            { id: 'managers', name: '👩‍💼 Менеджеры' },
             { id: 'bots', name: '🤖 Боты' },
             { id: 'users', name: '👥 Пользователи' },
             { id: 'telegram', name: '📱 Telegram' },
@@ -625,38 +646,42 @@ function App() {
                 <button onClick={addNewClient} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить клиента</button>
               )}
             </div>
-            {Object.values(clients).map(c => (
-              <div key={c.id} style={{ ...sectionStyle, borderLeft: c.featured ? '4px solid #FF9800' : 'none' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
-                      {c.featured && <span style={{ background: '#FF9800', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>VIP</span>}
-                      {!c.active && <span style={{ background: '#f44336', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>ОТКЛ</span>}
+            {Object.values(clients).map(c => {
+              const mgr = getManager(c.managerId)
+              return (
+                <div key={c.id} style={{ ...sectionStyle, borderLeft: c.featured ? '4px solid #FF9800' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
+                        {c.featured && <span style={{ background: '#FF9800', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>VIP</span>}
+                        {!c.active && <span style={{ background: '#f44336', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>ОТКЛ</span>}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
                     </div>
-                    <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {(isAdmin || isOperator) && (
+                        <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
+                      )}
+                      {isAdmin && (
+                        <button onClick={() => deleteClient(c.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {(isAdmin || isOperator) && (
-                      <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
-                    )}
-                    {isAdmin && (
-                      <button onClick={() => deleteClient(c.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
-                    )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 13, marginBottom: 8 }}>
+                    <div>📍 <b>{c.address || 'Не указан'}</b></div>
+                    <div>👤 Менеджер: <b>{mgr?.name || 'Не назначен'}</b></div>
+                    <div>📞 {mgr?.phone || '-'}</div>
+                    <div>💰 Скидка: <b>{c.discount}%</b></div>
                   </div>
+                  {c.adminComment && (
+                    <div style={{ padding: 10, background: '#FFF3E0', borderRadius: 8, fontSize: 13 }}>
+                      💬 {c.adminComment}
+                    </div>
+                  )}
                 </div>
-                {c.adminComment && (
-                  <div style={{ padding: 10, background: '#FFF3E0', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
-                    💬 {c.adminComment}
-                  </div>
-                )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 13 }}>
-                  <div>Тип: <b>{c.companyType}</b></div>
-                  <div>Скидка: <b>{c.discount}%</b></div>
-                  <div>Менеджер: <b>{c.manager?.name || '-'}</b></div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -668,17 +693,22 @@ function App() {
             ) : (
               orders.map(order => {
                 const clientName = clients[order.clientId]?.company || 'Unknown'
+                const clientAddr = clients[order.clientId]?.address || ''
                 return (
-                  <div key={order.id} style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: '600' }}>{clientName}</div>
-                      <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.date}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 'bold' }}>{order.total.toLocaleString()}₽</div>
-                      <span style={{ padding: '4px 12px', background: order.status === 'waiting' ? '#FFF3E0' : '#E8F5E9', borderRadius: 16, fontSize: 12 }}>
-                        {order.status === 'waiting' ? '⏳ Ожидание' : '✓ Подтверждён'}
-                      </span>
+                  <div key={order.id} style={{ padding: 12, background: '#fafafa', borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: '600' }}>{clientName}</div>
+                        <div style={{ fontSize: 13, color: '#666' }}>📍 {clientAddr}</div>
+                        <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.date}</div>
+                        {order.guestComment && <div style={{ fontSize: 12, color: '#1976D2', marginTop: 4 }}>💬 {order.guestComment}</div>}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 'bold' }}>{order.total.toLocaleString()}₽</div>
+                        <span style={{ padding: '4px 12px', background: order.status === 'waiting' ? '#FFF3E0' : '#E8F5E9', borderRadius: 16, fontSize: 12 }}>
+                          {order.status === 'waiting' ? '⏳ Ожидание' : '✓ Подтверждён'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )
@@ -692,11 +722,13 @@ function App() {
             <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования ({orders.filter(o => o.status === 'waiting').length})</h3>
             {orders.filter(o => o.status === 'waiting').map(order => {
               const clientName = clients[order.clientId]?.company || 'Unknown'
+              const clientAddr = clients[order.clientId]?.address || ''
               return (
                 <div key={order.id} style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: '600' }}>{clientName}</div>
+                      <div style={{ fontSize: 13, color: '#666' }}>📍 {clientAddr}</div>
                       <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]}, {order.date}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -708,7 +740,7 @@ function App() {
                       setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))
                       const activeBot = bots.find(b => b.active)
                       if (activeBot) {
-                        await sendToTelegram(activeBot, `✅ *Заказ подтверждён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}\n\n💰 Сумма: ${order.total.toLocaleString()}₽`, threads.orders)
+                        await sendToTelegram(activeBot, `✅ *Заказ подтверждён*\n\n*Компания:* ${clientName}\n*Адрес:* ${clientAddr}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}\n\n💰 Сумма: ${order.total.toLocaleString()}₽`, threads.orders)
                       }
                     }} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
                     <button onClick={async () => {
@@ -728,13 +760,70 @@ function App() {
           </div>
         )}
 
+        {tab === 'reports' && (
+          <div style={sectionStyle}>
+            <h3 style={{ marginTop: 0 }}>📈 Отчёты</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div style={{ padding: 16, background: '#E3F2FD', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1976D2' }}>{orders.length}</div>
+                <div style={{ fontSize: 12, color: '#666' }}>Всего заказов</div>
+              </div>
+              <div style={{ padding: 16, background: '#E8F5E9', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#4CAF50' }}>{orders.reduce((s,o) => s+o.total, 0).toLocaleString()}₽</div>
+                <div style={{ fontSize: 12, color: '#666' }}>Общая сумма</div>
+              </div>
+            </div>
+            <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, fontSize: 13 }}>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>📋 Последние заказы:</div>
+              {orders.slice(-10).reverse().map(order => {
+                const c = clients[order.clientId]
+                return (
+                  <div key={order.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                    <b>{c?.company || 'Unknown'}</b> - {order.total.toLocaleString()}₽ ({order.date})
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === 'managers' && isAdmin && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: '#666' }}>Всего менеджеров: {managers.length}</span>
+              <button onClick={addNewManager} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить менеджера</button>
+            </div>
+            {managers.map(mgr => (
+              <div key={mgr.id} style={{ ...sectionStyle, borderLeft: '4px solid #9C27B0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 18 }}>👩‍💼 {mgr.name}</h3>
+                  </div>
+                  <button onClick={() => deleteManager(mgr.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={labelStyle}>Имя:</label>
+                    <input type="text" value={mgr.name} onChange={(e) => saveManager(mgr.id, 'name', e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Телефон:</label>
+                    <input type="text" value={mgr.phone} onChange={(e) => saveManager(mgr.id, 'phone', e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+                <label style={labelStyle}>Telegram:</label>
+                <input type="text" value={mgr.telegram} onChange={(e) => saveManager(mgr.id, 'telegram', e.target.value)} style={inputStyle} placeholder="@username" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {tab === 'bots' && isAdmin && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: '#666' }}>Всего ботов: {bots.length}</span>
               <button onClick={addNewBot} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить бота</button>
             </div>
-            
             {bots.map(bot => (
               <div key={bot.id} style={{ ...sectionStyle, borderLeft: bot.active ? '4px solid #4CAF50' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -743,16 +832,11 @@ function App() {
                       <h3 style={{ margin: 0, fontSize: 18 }}>🤖 {bot.name}</h3>
                       {bot.active && <span style={{ background: '#4CAF50', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>АКТИВЕН</span>}
                     </div>
-                    <div style={{ fontSize: 13, color: '#666' }}>ID: {bot.id}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => setEditingBot({...bot})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
                     <button onClick={() => deleteBot(bot.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
                   </div>
-                </div>
-                <div style={{ fontSize: 13, marginBottom: 8 }}>
-                  <div>Token: <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{bot.token?.slice(0, 20)}...</code></div>
-                  <div>Chat ID: <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{bot.chatId}</code></div>
                 </div>
                 <button onClick={() => toggleBotActive(bot.id)} style={{
                   padding: '8px 16px', background: bot.active ? '#FF9800' : '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13
@@ -761,10 +845,6 @@ function App() {
                 </button>
               </div>
             ))}
-
-            {bots.length === 0 && (
-              <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Нет ботов. Добавьте бота.</div>
-            )}
           </div>
         )}
 
@@ -774,7 +854,6 @@ function App() {
               <span style={{ fontSize: 13, color: '#666' }}>Всего пользователей: {Object.keys(users).length}</span>
               <button onClick={addNewUser} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить оператора</button>
             </div>
-            
             {Object.entries(users).map(([id, user]) => (
               <div key={id} style={{ ...sectionStyle, borderLeft: user.role === 'admin' ? '4px solid #9C27B0' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -783,11 +862,8 @@ function App() {
                       <h3 style={{ margin: 0, fontSize: 18 }}>👤 {user.name}</h3>
                       <span style={{ background: user.role === 'admin' ? '#9C27B0' : '#2196F3', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>{user.role === 'admin' ? 'АДМИН' : 'ОПЕРАТОР'}</span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#666' }}>ID: {id}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => deleteUser(id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
-                  </div>
+                  <button onClick={() => deleteUser(id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
@@ -799,12 +875,6 @@ function App() {
                     <input type="text" value={user.password} onChange={(e) => saveUserEdit(id, 'password', e.target.value)} style={inputStyle} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="checkbox" checked={user.role === 'admin'} onChange={(e) => saveUserEdit(id, 'role', e.target.checked ? 'admin' : 'operator')} />
-                    Админ
-                  </label>
-                </div>
               </div>
             ))}
           </div>
@@ -813,7 +883,6 @@ function App() {
         {tab === 'telegram' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📱 Настройки Telegram</h3>
-            
             <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 12 }}>
               <div style={{ fontWeight: '600', marginBottom: 8 }}>📋 ID топиков</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -823,10 +892,12 @@ function App() {
                 <div>📋 Заявки: <input type="number" value={threads.orders} onChange={(e) => setThreads({...threads, orders: parseInt(e.target.value)})} style={{ width: 60, padding: 4 }} /></div>
               </div>
             </div>
-
             <button onClick={testTelegram} style={{ ...buttonPrimaryStyle, background: '#FF9800', marginBottom: 12 }}>
               🧪 Тест всех топиков
             </button>
+            <div style={{ padding: 12, background: '#E8F5E9', borderRadius: 8, fontSize: 13 }}>
+              💡 <b>Заказы приходят в Telegram!</b> Настройте бота и он будет получать все новые заказы в группу.
+            </div>
           </div>
         )}
 
@@ -850,8 +921,55 @@ function App() {
               <label style={labelStyle}>Контакт:</label>
               <input type="text" value={editingClient.contact} onChange={(e) => setEditingClient({...editingClient, contact: e.target.value})} style={inputStyle} />
 
+
               <label style={labelStyle}>Телефон:</label>
               <input type="text" value={editingClient.phone} onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>📍 Адрес доставки:</label>
+              <input type="text" value={editingClient.address || ''} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} placeholder="г. Санкт-Петербург, ул. ..., д." />
+
+              <label style={labelStyle}>👥 Количество сотрудников:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11 }}>Обычное:</label>
+                  <input type="number" value={editingClient.staff?.regular || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, regular: parseInt(e.target.value) || 0 }})} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11 }}>Халяль:</label>
+                  <input type="number" value={editingClient.staff?.halal || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, halal: parseInt(e.target.value) || 0 }})} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11 }}>ПП:</label>
+                  <input type="number" value={editingClient.staff?.pp || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, pp: parseInt(e.target.value) || 0 }})} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11 }}>Директорат:</label>
+                  <input type="number" value={editingClient.staff?.director || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, director: parseInt(e.target.value) || 0 }})} style={inputStyle} />
+                </div>
+              </div>
+
+              <label style={labelStyle}>⏰ Время доставки:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11 }}>🥐 Завтрак:</label>
+                  <input type="text" value={editingClient.deliveryTime?.breakfast || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: { ...editingClient.deliveryTime, breakfast: e.target.value }})} style={inputStyle} placeholder="07:30-08:30" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11 }}>🍱 Обед:</label>
+                  <input type="text" value={editingClient.deliveryTime?.lunch || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: { ...editingClient.deliveryTime, lunch: e.target.value }})} style={inputStyle} placeholder="12:00-13:00" />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11 }}>🍽️ Ужин:</label>
+                  <input type="text" value={editingClient.deliveryTime?.dinner || ''} onChange={(e) => setEditingClient({...editingClient, deliveryTime: { ...editingClient.deliveryTime, dinner: e.target.value }})} style={inputStyle} placeholder="17:30-18:30" />
+                </div>
+              </div>
+
+              <label style={labelStyle}>👩‍💼 Менеджер:</label>
+              <select value={editingClient.managerId || 1} onChange={(e) => setEditingClient({...editingClient, managerId: parseInt(e.target.value)})} style={inputStyle}>
+                {managers.map(mgr => (
+                  <option key={mgr.id} value={mgr.id}>{mgr.name} ({mgr.phone})</option>
+                ))}
+              </select>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -915,6 +1033,7 @@ function App() {
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>{currentClient.company}</h2>
             <div style={{ fontSize: 13, color: '#666' }}>{currentClient.contact} • {currentClient.phone}</div>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>📍 {currentClient.address}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <span style={{ background: '#4CAF50', color: '#fff', padding: '4px 10px', borderRadius: 16, fontSize: 11 }}>Договор</span>
@@ -955,7 +1074,15 @@ function App() {
           </div>
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0, fontSize: 14 }}>📞 Менеджер</h3>
-            <div style={{ fontSize: 14 }}>{currentClient.manager?.name} • {currentClient.manager?.phone}</div>
+            {(() => {
+              const mgr = getManager(currentClient.managerId)
+              return (
+                <div style={{ fontSize: 14 }}>
+                  {mgr?.name || 'Не назначен'} • {mgr?.phone || '-'}
+                  {mgr?.telegram && <div style={{ fontSize: 12, color: '#666' }}>{mgr.telegram}</div>}
+                </div>
+              )
+            })()}
           </div>
         </>
       )}
