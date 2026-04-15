@@ -6,15 +6,19 @@ const COMPANY_TYPES = [
   { id: 'quarter', name: 'Квартал', emoji: '📅' }
 ]
 
-// ID Google таблицы
 const SPREADSHEET_ID = '1VRSHLi1eu7k5cT6lAYWvXbIToTpcMj1rx2saiWwENp4'
 
-// Токен бота и ID группы
-const BOT_TOKEN = '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y'
-const GROUP_CHAT_ID = '-1002583331823'
+const DEFAULT_BOTS = [
+  {
+    id: 'bot1',
+    name: 'Shyrik',
+    token: '6706048508:AAF-8INmBKwP1x7DA-_ET8D282c5pp0Rn2Y',
+    chatId: '-1002583331823',
+    active: true
+  }
+]
 
-// ID топиков (ЧИСЛА!)
-const THREADS = {
+const DEFAULT_THREADS = {
   waiting: 360,
   newUser: 361,
   history: 362,
@@ -41,18 +45,6 @@ const MEALS = [
   { id: 'dinner', name: 'Ужин', emoji: '🍽️' }
 ]
 
-const PAYMENT_METHODS = [
-  { id: 'cash', name: 'Наличные', emoji: '💵' },
-  { id: 'card', name: 'Безналичный', emoji: '💳' },
-  { id: 'account', name: 'Счёт', emoji: '🏦' }
-]
-
-const PAYMENT_PERIODS = [
-  { id: 'daily', name: 'День в день' },
-  { id: 'weekly', name: 'Раз в неделю' },
-  { id: 'monthly', name: 'Раз в месяц' }
-]
-
 const DAYS_RU = {
   monday: 'Понедельник', tuesday: 'Вторник', wednesday: 'Среда',
   thursday: 'Четверг', friday: 'Пятница', saturday: 'Суббота', sunday: 'Воскресенье'
@@ -77,42 +69,6 @@ const buttonPrimaryStyle = {
   padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer'
 }
 
-// === TELEGRAM ===
-const sendToTelegram = async (message, threadId) => {
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: GROUP_CHAT_ID,
-        text: message,
-        parse_mode: 'Markdown',
-        message_thread_id: Number(threadId)
-      })
-    })
-    const data = await response.json()
-    console.log('Telegram response:', data)
-    return data.ok
-  } catch (err) {
-    console.log('Telegram error:', err)
-    return false
-  }
-}
-
-const sendByEvent = async (eventType, message) => {
-  const threadMap = {
-    new_order: THREADS.waiting,
-    new_user: THREADS.newUser,
-    client_comment: THREADS.history,
-    admin_edit: THREADS.history,
-    order_confirmed: THREADS.orders,
-    order_cancelled: THREADS.orders
-  }
-  const threadId = threadMap[eventType]
-  return await sendToTelegram(message, threadId)
-}
-
-// === LOCAL STORAGE ===
 const loadFromStorage = (key) => {
   try {
     const data = localStorage.getItem('food_' + key)
@@ -127,7 +83,6 @@ const saveToStorage = (key, data) => {
   } catch (e) { return false }
 }
 
-// Дефолтные клиенты
 const DEFAULT_CLIENTS = {
   'TEST-001': {
     id: 'TEST-001', company: 'ООО ТехноСтрой', inn: '7812345678', contact: 'Петров Сергей',
@@ -182,6 +137,10 @@ function App() {
 
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  const [bots, setBots] = useState([])
+  const [threads, setThreads] = useState(DEFAULT_THREADS)
+  const [editingBot, setEditingBot] = useState(null)
 
   useEffect(() => {
     const loadData = () => {
@@ -190,6 +149,12 @@ function App() {
       
       const savedOrders = loadFromStorage('orders')
       setOrders(savedOrders || [])
+      
+      const savedBots = loadFromStorage('bots')
+      setBots(savedBots || DEFAULT_BOTS)
+      
+      const savedThreads = loadFromStorage('threads')
+      if (savedThreads) setThreads(savedThreads)
       
       setLoading(false)
     }
@@ -207,6 +172,18 @@ function App() {
       saveToStorage('orders', orders)
     }
   }, [orders, loading])
+
+  useEffect(() => {
+    if (!loading && bots.length > 0) {
+      saveToStorage('bots', bots)
+    }
+  }, [bots, loading])
+
+  useEffect(() => {
+    if (!loading) {
+      saveToStorage('threads', threads)
+    }
+  }, [threads, loading])
 
   useEffect(() => {
     const hash = window.location.hash.slice(1)
@@ -229,13 +206,21 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault()
-    const normalized = contractNumber.toUpperCase().trim()
-    if (normalized === 'ADMIN') {
+    const normalized = contractNumber.trim()
+    
+    if (normalized === '0901SmolAdmin') {
       navigate('admin')
       return
     }
-    if (clients[normalized]) {
-      const c = clients[normalized]
+    
+    const upperNormalized = normalized.toUpperCase().trim()
+    if (upperNormalized === 'ADMIN') {
+      navigate('admin')
+      return
+    }
+    
+    if (clients[upperNormalized]) {
+      const c = clients[upperNormalized]
       if (!c.active) {
         setLoginError('Договор приостановлен')
         return
@@ -252,8 +237,11 @@ function App() {
   const handleNewUserSubmit = async (e) => {
     e.preventDefault()
     if (client.company && client.contact && client.phone) {
-      const message = `📋 *Новая заявка!*\n\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}\n*Тип:* ${COMPANY_TYPES.find(t => t.id === companyType)?.name || companyType}`
-      await sendByEvent('new_user', message)
+      const activeBot = bots.find(b => b.active)
+      if (activeBot) {
+        const message = `📋 *Новая заявка!*\n\n*Компания:* ${client.company}\n*Контакт:* ${client.contact}\n*Телефон:* ${client.phone}\n*Тип:* ${COMPANY_TYPES.find(t => t.id === companyType)?.name || companyType}`
+        await sendToTelegram(activeBot, message, threads.newUser)
+      }
       alert('Заявка отправлена!')
       navigate('login')
     }
@@ -261,8 +249,11 @@ function App() {
 
   const handleSendComment = async () => {
     if (comment.trim() && currentClient) {
-      const message = `💬 *${currentClient.company}:*\n\n${comment}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
-      await sendByEvent('client_comment', message)
+      const activeBot = bots.find(b => b.active)
+      if (activeBot) {
+        const message = `💬 *${currentClient.company}:*\n\n${comment}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
+        await sendToTelegram(activeBot, message, threads.history)
+      }
       alert('Отправлено!')
       setComment('')
       setCommentSent(true)
@@ -281,8 +272,11 @@ function App() {
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
 
       if (changes.length > 0) {
-        const logMessage = `📝 *Изменение: ${editingClient.company}*\n\n${changes.join('\n')}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
-        await sendByEvent('admin_edit', logMessage)
+        const activeBot = bots.find(b => b.active)
+        if (activeBot) {
+          const logMessage = `📝 *Изменение: ${editingClient.company}*\n\n${changes.join('\n')}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
+          await sendToTelegram(activeBot, logMessage, threads.history)
+        }
       }
 
       setEditingClient(null)
@@ -310,8 +304,11 @@ function App() {
 
     setOrders(prev => [...prev, newOrder])
 
-    const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
-    await sendByEvent('new_order', orderMessage)
+    const activeBot = bots.find(b => b.active)
+    if (activeBot) {
+      const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
+      await sendToTelegram(activeBot, orderMessage, threads.waiting)
+    }
 
     alert('Заказ отправлен на согласование!')
   }
@@ -331,8 +328,11 @@ function App() {
   const deleteClient = async (clientId) => {
     if (confirm('Удалить клиента?')) {
       const c = clients[clientId]
-      const message = `🗑️ *Клиент удалён:* ${c.company}\nID: ${clientId}\n📅 ${new Date().toLocaleString('ru-RU')}`
-      await sendByEvent('admin_edit', message)
+      const activeBot = bots.find(b => b.active)
+      if (activeBot) {
+        const message = `🗑️ *Клиент удалён:* ${c.company}\nID: ${clientId}\n📅 ${new Date().toLocaleString('ru-RU')}`
+        await sendToTelegram(activeBot, message, threads.history)
+      }
       setClients(prev => {
         const updated = { ...prev }
         delete updated[clientId]
@@ -341,18 +341,83 @@ function App() {
     }
   }
 
+  const addNewBot = () => {
+    const newBot = {
+      id: 'bot' + Date.now(),
+      name: 'Новый бот',
+      token: '',
+      chatId: '',
+      active: bots.length === 0
+    }
+    setEditingBot(newBot)
+  }
+
+  const saveBot = () => {
+    if (editingBot) {
+      setBots(prev => {
+        const existing = prev.find(b => b.id === editingBot.id)
+        if (existing) {
+          return prev.map(b => b.id === editingBot.id ? editingBot : b)
+        } else {
+          return [...prev, editingBot]
+        }
+      })
+      setEditingBot(null)
+      alert('Бот сохранён!')
+    }
+  }
+
+  const deleteBot = (botId) => {
+    if (confirm('Удалить бота?')) {
+      setBots(prev => prev.filter(b => b.id !== botId))
+    }
+  }
+
+  const toggleBotActive = (botId) => {
+    setBots(prev => prev.map(b => ({
+      ...b,
+      active: b.id === botId ? !b.active : false
+    })))
+  }
+
+  const sendToTelegram = async (bot, message, threadId) => {
+    if (!bot || !bot.token || !bot.chatId) return false
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${bot.token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: bot.chatId,
+          text: message,
+          parse_mode: 'Markdown',
+          message_thread_id: Number(threadId)
+        })
+      })
+      return (await response.json()).ok
+    } catch (err) {
+      console.log('Telegram error:', err)
+      return false
+    }
+  }
+
   const testTelegram = async () => {
+    const activeBot = bots.find(b => b.active)
+    if (!activeBot) {
+      alert('Нет активного бота!')
+      return
+    }
+
     const results = []
     const tests = [
-      { id: THREADS.waiting, name: 'Ожидание' },
-      { id: THREADS.newUser, name: 'Новый пользователь' },
-      { id: THREADS.history, name: 'История' },
-      { id: THREADS.orders, name: 'Заявки' }
+      { id: threads.waiting, name: 'Ожидание' },
+      { id: threads.newUser, name: 'Новый пользователь' },
+      { id: threads.history, name: 'История' },
+      { id: threads.orders, name: 'Заявки' }
     ]
 
     for (const t of tests) {
       const msg = `🧪 *Тест ${t.name}*\n\nID топика: ${t.id}\n⏰ ${new Date().toLocaleString('ru-RU')}`
-      const ok = await sendToTelegram(msg, t.id)
+      const ok = await sendToTelegram(activeBot, msg, t.id)
       results.push(`${t.name}: ${ok ? '✅' : '❌'}`)
     }
 
@@ -360,9 +425,6 @@ function App() {
   }
 
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
-  const getPaymentMethodName = (id) => PAYMENT_METHODS.find(p => p.id === id)?.name || id
-  const getPaymentPeriodName = (id) => PAYMENT_PERIODS.find(p => p.id === id)?.name || id
-  const getCompanyTypeName = (id) => COMPANY_TYPES.find(t => t.id === id)?.name || id
 
   const todayOrders = orders.filter(o => o.status === 'waiting')
 
@@ -375,7 +437,6 @@ function App() {
     )
   }
 
-  // === ВХОД ===
   if (!currentClient && view !== 'admin') {
     return (
       <div style={{ padding: 16, maxWidth: 450, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -386,7 +447,7 @@ function App() {
         <div style={sectionStyle}>
           <h2 style={{ marginTop: 0, marginBottom: 16, textAlign: 'center' }}>🔐 Вход</h2>
           <form onSubmit={handleLogin}>
-            <label style={labelStyle}>Номер договора</label>
+            <label style={labelStyle}>Номер договора / Пароль</label>
             <input type="text" placeholder="TEST-001" value={contractNumber}
               onChange={(e) => setContractNumber(e.target.value)} style={inputStyle} />
             {loginError && <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{loginError}</div>}
@@ -403,7 +464,6 @@ function App() {
     )
   }
 
-  // === НОВЫЙ ПОЛЬЗОВАТЕЛЬ ===
   if (view === 'new-user') {
     return (
       <div style={{ padding: 16, maxWidth: 500, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -439,7 +499,6 @@ function App() {
     )
   }
 
-  // === АДМИН ===
   if (view === 'admin') {
     return (
       <div style={{ padding: 16, maxWidth: 900, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -453,6 +512,7 @@ function App() {
             { id: 'clients', name: '🏢 Клиенты' },
             { id: 'orders', name: '📋 Заказы' },
             { id: 'waiting', name: '📥 Ожидание' },
+            { id: 'bots', name: '🤖 Боты' },
             { id: 'telegram', name: '📱 Telegram' }
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -464,7 +524,6 @@ function App() {
           ))}
         </div>
 
-        {/* === КЛИЕНТЫ === */}
         {tab === 'clients' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -493,19 +552,15 @@ function App() {
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 13 }}>
-                  <div>Тип: <b>{getCompanyTypeName(c.companyType)}</b></div>
+                  <div>Тип: <b>{c.companyType}</b></div>
                   <div>Скидка: <b>{c.discount}%</b></div>
-                  <div>Оплата: <b>{getPaymentMethodName(c.paymentMethod)}</b></div>
                   <div>Менеджер: <b>{c.manager?.name || '-'}</b></div>
-                  <div>Тел: <b>{c.manager?.phone || '-'}</b></div>
-                  <div>Договор: <b>{c.contractDate || '-'}</b></div>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* === ЗАКАЗЫ === */}
         {tab === 'orders' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📋 Все заказы ({orders.length})</h3>
@@ -519,9 +574,6 @@ function App() {
                     <div>
                       <div style={{ fontWeight: '600' }}>{clientName}</div>
                       <div style={{ fontSize: 13, color: '#666' }}>{DAYS_RU[order.day]} • {order.date}</div>
-                      <div style={{ fontSize: 12, color: '#666' }}>
-                        🥐{order.meals.breakfast} • 🍱{order.meals.lunch} • 🍽️{order.meals.dinner}
-                      </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 'bold' }}>{order.total.toLocaleString()}₽</div>
@@ -536,7 +588,6 @@ function App() {
           </div>
         )}
 
-        {/* === ОЖИДАНИЕ === */}
         {tab === 'waiting' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📥 Ожидают согласования ({orders.filter(o => o.status === 'waiting').length})</h3>
@@ -551,19 +602,22 @@ function App() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontWeight: 'bold', color: '#FF9800' }}>{order.total.toLocaleString()}₽</div>
-                      <div style={{ fontSize: 12, color: '#666' }}>
-                        🥐{order.meals.breakfast} • 🍱{order.meals.lunch} • 🍽️{order.meals.dinner}
-                      </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <button onClick={async () => {
                       setOrders(prev => prev.map(o => o.id === order.id ? {...o, status: 'confirmed'} : o))
-                      await sendByEvent('order_confirmed', `✅ *Заказ подтверждён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}\n\n💰 Сумма: ${order.total.toLocaleString()}₽`)
+                      const activeBot = bots.find(b => b.active)
+                      if (activeBot) {
+                        await sendToTelegram(activeBot, `✅ *Заказ подтверждён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}\n\n💰 Сумма: ${order.total.toLocaleString()}₽`, threads.orders)
+                      }
                     }} style={{ flex: 1, padding: '8px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✓ Подтвердить</button>
                     <button onClick={async () => {
                       setOrders(prev => prev.filter(o => o.id !== order.id))
-                      await sendByEvent('order_cancelled', `❌ *Заказ отменён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}`)
+                      const activeBot = bots.find(b => b.active)
+                      if (activeBot) {
+                        await sendToTelegram(activeBot, `❌ *Заказ отменён*\n\n*Компания:* ${clientName}\n*Дата:* ${DAYS_RU[order.day]}, ${order.date}`, threads.orders)
+                      }
                     }} style={{ flex: 1, padding: '8px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>✕ Отклонить</button>
                   </div>
                 </div>
@@ -575,33 +629,57 @@ function App() {
           </div>
         )}
 
-        {/* === TELEGRAM === */}
+        {tab === 'bots' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: '#666' }}>Всего ботов: {bots.length}</span>
+              <button onClick={addNewBot} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить бота</button>
+            </div>
+            
+            {bots.map(bot => (
+              <div key={bot.id} style={{ ...sectionStyle, borderLeft: bot.active ? '4px solid #4CAF50' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 style={{ margin: 0, fontSize: 18 }}>🤖 {bot.name}</h3>
+                      {bot.active && <span style={{ background: '#4CAF50', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>АКТИВЕН</span>}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#666' }}>ID: {bot.id}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setEditingBot({...bot})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
+                    <button onClick={() => deleteBot(bot.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, marginBottom: 8 }}>
+                  <div>Token: <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{bot.token?.slice(0, 20)}...</code></div>
+                  <div>Chat ID: <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{bot.chatId}</code></div>
+                </div>
+                <button onClick={() => toggleBotActive(bot.id)} style={{
+                  padding: '8px 16px', background: bot.active ? '#FF9800' : '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13
+                }}>
+                  {bot.active ? 'Деактивировать' : 'Активировать'}
+                </button>
+              </div>
+            ))}
+
+            {bots.length === 0 && (
+              <div style={{ padding: 20, textAlign: 'center', color: '#666' }}>Нет ботов. Добавьте бота.</div>
+            )}
+          </div>
+        )}
+
         {tab === 'telegram' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📱 Настройки Telegram</h3>
             
-            <div style={{ padding: 12, background: '#E8F5E9', borderRadius: 8, marginBottom: 12 }}>
-              <div style={{ fontWeight: '600', marginBottom: 8 }}>🤖 Бот</div>
-              <div style={{ fontSize: 13 }}>Имя: <b>Shyrik</b></div>
-              <div style={{ fontSize: 13 }}>Username: <b>@Sgrer01_bot</b></div>
-              <div style={{ fontSize: 13 }}>ID: <b>6706048508</b></div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>Статус: <span style={{ color: '#4CAF50' }}>✅ Работает</span></div>
-            </div>
-
-            <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, marginBottom: 12 }}>
-              <div style={{ fontWeight: '600', marginBottom: 8 }}>💬 Группа</div>
-              <div style={{ fontSize: 13 }}>Название: <b>Тест группа</b></div>
-              <div style={{ fontSize: 13 }}>Username: <b>@test_shyrik</b></div>
-              <div style={{ fontSize: 13 }}>Chat ID: <code style={{ background: '#fff', padding: '2px 6px', borderRadius: 4 }}>{GROUP_CHAT_ID}</code></div>
-            </div>
-
             <div style={{ padding: 12, background: '#FFF3E0', borderRadius: 8, marginBottom: 12 }}>
-              <div style={{ fontWeight: '600', marginBottom: 8 }}>📋 Топики</div>
-              <div style={{ fontSize: 13, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div>📥 Ожидание: <b>{THREADS.waiting}</b></div>
-                <div>👤 Новый: <b>{THREADS.newUser}</b></div>
-                <div>📜 История: <b>{THREADS.history}</b></div>
-                <div>📋 Заявки: <b>{THREADS.orders}</b></div>
+              <div style={{ fontWeight: '600', marginBottom: 8 }}>📋 ID топиков</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>📥 Ожидание: <input type="number" value={threads.waiting} onChange={(e) => setThreads({...threads, waiting: parseInt(e.target.value)})} style={{ width: 60, padding: 4 }} /></div>
+                <div>👤 Новый: <input type="number" value={threads.newUser} onChange={(e) => setThreads({...threads, newUser: parseInt(e.target.value)})} style={{ width: 60, padding: 4 }} /></div>
+                <div>📜 История: <input type="number" value={threads.history} onChange={(e) => setThreads({...threads, history: parseInt(e.target.value)})} style={{ width: 60, padding: 4 }} /></div>
+                <div>📋 Заявки: <input type="number" value={threads.orders} onChange={(e) => setThreads({...threads, orders: parseInt(e.target.value)})} style={{ width: 60, padding: 4 }} /></div>
               </div>
             </div>
 
@@ -609,23 +687,12 @@ function App() {
               🧪 Тест всех топиков
             </button>
 
-            <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
-              <div style={{ fontWeight: '600', marginBottom: 8 }}>📊 Ссылки на топики</div>
-              <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <a href="https://t.me/test_shyrik/360" target="_blank" style={{ color: '#1976D2' }}>📥 Ожидание</a>
-                <a href="https://t.me/test_shyrik/361" target="_blank" style={{ color: '#1976D2' }}>👤 Новый пользователь</a>
-                <a href="https://t.me/test_shyrik/362" target="_blank" style={{ color: '#1976D2' }}>📜 История</a>
-                <a href="https://t.me/test_shyrik/359" target="_blank" style={{ color: '#1976D2' }}>📋 Заявки</a>
-              </div>
-            </div>
-
             <div style={{ marginTop: 16, padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
               📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
             </div>
           </div>
         )}
 
-        {/* === РЕДАКТИРОВАНИЕ КЛИЕНТА === */}
         {editingClient && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
             <div style={{ background: '#fff', padding: 24, borderRadius: 16, maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
@@ -664,11 +731,32 @@ function App() {
             </div>
           </div>
         )}
+
+        {editingBot && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+            <div style={{ background: '#fff', padding: 24, borderRadius: 16, maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
+              <h2 style={{ marginTop: 0 }}>Редактирование бота</h2>
+
+              <label style={labelStyle}>Название:</label>
+              <input type="text" value={editingBot.name} onChange={(e) => setEditingBot({...editingBot, name: e.target.value})} style={inputStyle} />
+
+              <label style={labelStyle}>Token бота:</label>
+              <input type="text" value={editingBot.token} onChange={(e) => setEditingBot({...editingBot, token: e.target.value})} style={inputStyle} placeholder="123456789:ABC..." />
+
+              <label style={labelStyle}>Chat ID группы:</label>
+              <input type="text" value={editingBot.chatId} onChange={(e) => setEditingBot({...editingBot, chatId: e.target.value})} style={inputStyle} placeholder="-1001234567890" />
+
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button onClick={saveBot} style={{ ...buttonPrimaryStyle, background: '#4CAF50' }}>💾 Сохранить</button>
+                <button onClick={() => setEditingBot(null)} style={{ ...buttonPrimaryStyle, background: '#f44336' }}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
-  // === КАБИНЕТ ===
   return (
     <div style={{ padding: 16, maxWidth: 550, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -783,16 +871,6 @@ function App() {
 
       {tab === 'settings' && (
         <>
-          <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0, fontSize: 14 }}>💰 Оплата</h3>
-            <div style={{ fontSize: 13 }}>{getPaymentMethodName(currentClient.paymentMethod)} • {getPaymentPeriodName(currentClient.paymentPeriod)}</div>
-          </div>
-          <div style={sectionStyle}>
-            <h3 style={{ marginTop: 0, fontSize: 14 }}>🚚 Доставка</h3>
-            {currentClient.deliveryTime?.breakfast && <div style={{ fontSize: 13 }}>🥐 {currentClient.deliveryTime.breakfast}</div>}
-            {currentClient.deliveryTime?.lunch && <div style={{ fontSize: 13 }}>🍱 {currentClient.deliveryTime.lunch}</div>}
-            {currentClient.deliveryTime?.dinner && <div style={{ fontSize: 13 }}>🍽️ {currentClient.deliveryTime.dinner}</div>}
-          </div>
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0, fontSize: 14 }}>💬 Сообщение менеджеру</h3>
             {commentSent ? (
