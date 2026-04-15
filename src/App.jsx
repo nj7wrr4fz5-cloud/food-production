@@ -116,13 +116,22 @@ const DEFAULT_CLIENTS = {
   }
 }
 
+const DEFAULT_USERS = {
+  '0901SmolAdmin': { id: '0901SmolAdmin', password: '0901SmolAdmin', role: 'admin', name: 'Админ' },
+  'ADMIN': { id: 'ADMIN', password: 'ADMIN', role: 'admin', name: 'Админ' },
+  'OPERATOR1': { id: 'OPERATOR1', password: 'operator123', role: 'operator', name: 'Оператор 1' }
+}
+
 function App() {
   const [view, setView] = useState('login')
   const [tab, setTab] = useState('clients')
   const [contractNumber, setContractNumber] = useState('')
+  const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [currentClient, setCurrentClient] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
   const [clients, setClients] = useState({})
+  const [users, setUsers] = useState({})
   const [editingClient, setEditingClient] = useState(null)
   const [companyType, setCompanyType] = useState('office')
   const [selectedMeals, setSelectedMeals] = useState([])
@@ -141,6 +150,10 @@ function App() {
   const [bots, setBots] = useState([])
   const [threads, setThreads] = useState(DEFAULT_THREADS)
   const [editingBot, setEditingBot] = useState(null)
+  
+  const [recoveryMode, setRecoveryMode] = useState(false)
+  const [recoveryContract, setRecoveryContract] = useState('')
+  const [recoverySent, setRecoverySent] = useState(false)
 
   useEffect(() => {
     const loadData = () => {
@@ -156,10 +169,14 @@ function App() {
       const savedThreads = loadFromStorage('threads')
       if (savedThreads) setThreads(savedThreads)
       
+      const savedUsers = loadFromStorage('users')
+      setUsers(savedUsers || DEFAULT_USERS)
+      
       setLoading(false)
     }
     loadData()
   }, [])
+
 
   useEffect(() => {
     if (!loading && Object.keys(clients).length > 0) {
@@ -186,6 +203,12 @@ function App() {
   }, [threads, loading])
 
   useEffect(() => {
+    if (!loading && Object.keys(users).length > 0) {
+      saveToStorage('users', users)
+    }
+  }, [users, loading])
+
+  useEffect(() => {
     const hash = window.location.hash.slice(1)
     if (hash === 'admin') setView('admin')
     else if (hash === 'new') setView('new-user')
@@ -207,18 +230,15 @@ function App() {
   const handleLogin = (e) => {
     e.preventDefault()
     const normalized = contractNumber.trim()
+    const pass = password.trim()
     
-    if (normalized === '0901SmolAdmin') {
+    if (users[normalized] && users[normalized].password === pass) {
+      setCurrentUser(users[normalized])
       navigate('admin')
       return
     }
     
     const upperNormalized = normalized.toUpperCase().trim()
-    if (upperNormalized === 'ADMIN') {
-      navigate('admin')
-      return
-    }
-    
     if (clients[upperNormalized]) {
       const c = clients[upperNormalized]
       if (!c.active) {
@@ -230,7 +250,25 @@ function App() {
       setSelectedFoodTypes(['regular'])
       setLoginError('')
     } else {
-      setLoginError('Договор не найден')
+      setLoginError('Неверный логин или пароль')
+    }
+  }
+
+  const handleRecovery = async () => {
+    const upperContract = recoveryContract.trim().toUpperCase()
+    if (clients[upperContract]) {
+      const activeBot = bots.find(b => b.active)
+      if (activeBot) {
+        const newPassword = 'P' + Math.random().toString(36).slice(-6).toUpperCase()
+        const message = `🔐 *Восстановление пароля*\n\n*Компания:* ${clients[upperContract].company}\n*Договор:* ${upperContract}\n*Новый пароль:* ${newPassword}\n\n📅 ${new Date().toLocaleString('ru-RU')}`
+        await sendToTelegram(activeBot, message, threads.history)
+        setRecoverySent(true)
+        alert(`Запрос отправлен! Новый пароль будет выслан в группу Telegram.`)
+      } else {
+        alert('Настройте бота для отправки сообщений')
+      }
+    } else {
+      alert('Договор не найден')
     }
   }
 
@@ -265,11 +303,12 @@ function App() {
       const oldClient = clients[editingClient.id]
       const changes = []
 
-      if (oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
-      if (oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
-      if (oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
+      if (oldClient && oldClient.discount !== editingClient.discount) changes.push(`скидка: ${oldClient.discount}% → ${editingClient.discount}%`)
+      if (oldClient && oldClient.active !== editingClient.active) changes.push(`активность: ${oldClient.active ? 'вкл' : 'выкл'} → ${editingClient.active ? 'вкл' : 'выкл'}`)
+      if (oldClient && oldClient.featured !== editingClient.featured) changes.push(`VIP: ${oldClient.featured ? 'да' : 'нет'} → ${editingClient.featured ? 'да' : 'нет'}`)
 
       setClients(prev => ({ ...prev, [editingClient.id]: editingClient }))
+
 
       if (changes.length > 0) {
         const activeBot = bots.find(b => b.active)
@@ -304,6 +343,7 @@ function App() {
 
     setOrders(prev => [...prev, newOrder])
 
+
     const activeBot = bots.find(b => b.active)
     if (activeBot) {
       const orderMessage = `📥 *Новый заказ на согласование*\n\n*Компания:* ${currentClient.company}\n*Дата:* ${DAYS_RU[newOrder.day]}, ${newOrder.date}\n\n🥐 Завтрак: ${newOrder.meals.breakfast}\n🍱 Обед: ${newOrder.meals.lunch}\n🍽️ Ужин: ${newOrder.meals.dinner}\n\n💰 *Стоимость:* ${newOrder.total.toLocaleString()}₽`
@@ -336,6 +376,35 @@ function App() {
       setClients(prev => {
         const updated = { ...prev }
         delete updated[clientId]
+        return updated
+      })
+    }
+  }
+
+  const addNewUser = () => {
+    const newId = 'USER' + Date.now().toString().slice(-4).toUpperCase()
+    const newUser = {
+      id: newId,
+      password: 'pass123',
+      role: 'operator',
+      name: 'Новый оператор'
+    }
+    setUsers(prev => ({ ...prev, [newId]: newUser }))
+    alert(`Создан пользователь: ${newId}, пароль: pass123`)
+  }
+
+  const saveUserEdit = (userId, field, value) => {
+    setUsers(prev => ({
+      ...prev,
+      [userId]: { ...prev[userId], [field]: value }
+    }))
+  }
+
+  const deleteUser = (userId) => {
+    if (confirm('Удалить пользователя?')) {
+      setUsers(prev => {
+        const updated = { ...prev }
+        delete updated[userId]
         return updated
       })
     }
@@ -427,6 +496,9 @@ function App() {
   const getPrice = (foodType, meal) => PRICES[foodType]?.[meal] || 0
 
   const todayOrders = orders.filter(o => o.status === 'waiting')
+  
+  const isAdmin = currentUser?.role === 'admin'
+  const isOperator = currentUser?.role === 'operator'
 
   if (loading) {
     return (
@@ -446,19 +518,38 @@ function App() {
         </div>
         <div style={sectionStyle}>
           <h2 style={{ marginTop: 0, marginBottom: 16, textAlign: 'center' }}>🔐 Вход</h2>
-          <form onSubmit={handleLogin}>
-            <label style={labelStyle}>Номер договора / Пароль</label>
-            <input type="text" placeholder="TEST-001" value={contractNumber}
-              onChange={(e) => setContractNumber(e.target.value)} style={inputStyle} />
-            {loginError && <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{loginError}</div>}
-            <button type="submit" style={buttonPrimaryStyle}>Войти</button>
-          </form>
-          <button onClick={() => navigate('new')} style={{
-            ...buttonPrimaryStyle, background: '#fff', color: '#1976D2', border: '2px solid #1976D2', marginTop: 12
-          }}>📝 Оставить заявку</button>
-        </div>
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: '#666' }}>
-          📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>База данных</a>
+          {recoveryMode ? (
+            <>
+              <label style={labelStyle}>Номер договора</label>
+              <input type="text" placeholder="TEST-001" value={recoveryContract}
+                onChange={(e) => setRecoveryContract(e.target.value)} style={inputStyle} />
+              <button onClick={handleRecovery} style={buttonPrimaryStyle}>🔐 Восстановить пароль</button>
+              <button onClick={() => { setRecoveryMode(false); setRecoveryContract(''); setRecoverySent(false) }} style={{
+                ...buttonPrimaryStyle, background: '#fff', color: '#666', border: '1px solid #ccc', marginTop: 12
+              }}>← Назад к входу</button>
+            </>
+          ) : (
+            <form onSubmit={handleLogin}>
+              <label style={labelStyle}>Номер договора / Логин</label>
+              <input type="text" placeholder="TEST-001" value={contractNumber}
+                onChange={(e) => setContractNumber(e.target.value)} style={inputStyle} />
+              <label style={labelStyle}>Пароль</label>
+              <input type="password" placeholder="Пароль" value={password}
+                onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+              {loginError && <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{loginError}</div>}
+              <button type="submit" style={buttonPrimaryStyle}>Войти</button>
+            </form>
+          )}
+          {!recoveryMode && (
+            <>
+              <button onClick={() => navigate('new')} style={{
+                ...buttonPrimaryStyle, background: '#fff', color: '#1976D2', border: '2px solid #1976D2', marginTop: 12
+              }}>📝 Оставить заявку</button>
+              <button onClick={() => setRecoveryMode(true)} style={{
+                background: 'none', border: 'none', color: '#666', cursor: 'pointer', marginTop: 12, fontSize: 13
+              }}>🔐 Забыли пароль?</button>
+            </>
+          )}
         </div>
       </div>
     )
@@ -504,7 +595,7 @@ function App() {
       <div style={{ padding: 16, maxWidth: 900, margin: '0 auto', fontFamily: 'system-ui, sans-serif', background: '#f5f7fa', minHeight: '100vh' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h1 style={{ fontSize: 22, margin: 0, color: '#1976D2' }}>⚙️ Админ-панель</h1>
-          <button onClick={() => navigate('login')} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Выход</button>
+          <button onClick={() => { setCurrentUser(null); navigate('login') }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Выход</button>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }}>
@@ -513,7 +604,9 @@ function App() {
             { id: 'orders', name: '📋 Заказы' },
             { id: 'waiting', name: '📥 Ожидание' },
             { id: 'bots', name: '🤖 Боты' },
-            { id: 'telegram', name: '📱 Telegram' }
+            { id: 'users', name: '👥 Пользователи' },
+            { id: 'telegram', name: '📱 Telegram' },
+            { id: 'database', name: '📊 База данных' }
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{
@@ -528,7 +621,9 @@ function App() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: '#666' }}>Всего: {Object.keys(clients).length} клиентов</span>
-              <button onClick={addNewClient} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить клиента</button>
+              {(isAdmin || isOperator) && (
+                <button onClick={addNewClient} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить клиента</button>
+              )}
             </div>
             {Object.values(clients).map(c => (
               <div key={c.id} style={{ ...sectionStyle, borderLeft: c.featured ? '4px solid #FF9800' : 'none' }}>
@@ -542,8 +637,12 @@ function App() {
                     <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
-                    <button onClick={() => deleteClient(c.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    {(isAdmin || isOperator) && (
+                      <button onClick={() => setEditingClient({...c})} style={{ padding: '8px 16px', background: '#1976D2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Изменить</button>
+                    )}
+                    {isAdmin && (
+                      <button onClick={() => deleteClient(c.id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                    )}
                   </div>
                 </div>
                 {c.adminComment && (
@@ -629,7 +728,7 @@ function App() {
           </div>
         )}
 
-        {tab === 'bots' && (
+        {tab === 'bots' && isAdmin && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: '#666' }}>Всего ботов: {bots.length}</span>
@@ -669,6 +768,48 @@ function App() {
           </div>
         )}
 
+        {tab === 'users' && isAdmin && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: '#666' }}>Всего пользователей: {Object.keys(users).length}</span>
+              <button onClick={addNewUser} style={{ padding: '8px 16px', background: '#4CAF50', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>+ Добавить оператора</button>
+            </div>
+            
+            {Object.entries(users).map(([id, user]) => (
+              <div key={id} style={{ ...sectionStyle, borderLeft: user.role === 'admin' ? '4px solid #9C27B0' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 style={{ margin: 0, fontSize: 18 }}>👤 {user.name}</h3>
+                      <span style={{ background: user.role === 'admin' ? '#9C27B0' : '#2196F3', color: '#fff', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>{user.role === 'admin' ? 'АДМИН' : 'ОПЕРАТОР'}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#666' }}>ID: {id}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => deleteUser(id)} style={{ padding: '8px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>✕</button>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={labelStyle}>Имя:</label>
+                    <input type="text" value={user.name} onChange={(e) => saveUserEdit(id, 'name', e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Пароль:</label>
+                    <input type="text" value={user.password} onChange={(e) => saveUserEdit(id, 'password', e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={user.role === 'admin'} onChange={(e) => saveUserEdit(id, 'role', e.target.checked ? 'admin' : 'operator')} />
+                    Админ
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {tab === 'telegram' && (
           <div style={sectionStyle}>
             <h3 style={{ marginTop: 0 }}>📱 Настройки Telegram</h3>
@@ -686,9 +827,14 @@ function App() {
             <button onClick={testTelegram} style={{ ...buttonPrimaryStyle, background: '#FF9800', marginBottom: 12 }}>
               🧪 Тест всех топиков
             </button>
+          </div>
+        )}
 
-            <div style={{ marginTop: 16, padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
-              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2' }}>Открыть Google Таблицу</a>
+        {tab === 'database' && (
+          <div style={sectionStyle}>
+            <h3 style={{ marginTop: 0 }}>📊 База данных</h3>
+            <div style={{ padding: 12, background: '#E3F2FD', borderRadius: 8, fontSize: 13 }}>
+              📊 <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" style={{ color: '#1976D2', fontSize: 16 }}>Открыть Google Таблицу</a>
             </div>
           </div>
         )}
