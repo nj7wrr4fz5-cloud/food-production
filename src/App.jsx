@@ -74,22 +74,15 @@ const DEFAULT_CLIENTS = {
   }
 }
 
-// ВСЕ ПОЛЬЗОВАТЕЛИ СИСТЕМЫ
-const DEFAULT_USERS = {
-  // Админы
-  '0901SmolAdmin': { id: '0901SmolAdmin', password: '0901SmolAdmin', role: 'admin', name: 'Админ', lastLogin: null },
+// ВСЕ ПОЛЬЗОВАТЕЛИ СИСТЕМЫ - БАЗОВЫЕ (не меняются)
+const BASE_USERS = {
+  '0901SMOLADMIN': { id: '0901SmolAdmin', password: '0901SmolAdmin', role: 'admin', name: 'Админ', lastLogin: null },
   'ADMIN': { id: 'ADMIN', password: 'ADMIN', role: 'admin', name: 'Главный Админ', lastLogin: null },
-  
-  // Операторы / Менеджеры
   'OPERATOR1': { id: 'OPERATOR1', password: 'operator123', role: 'operator', name: 'Оператор 1 - Анна', managerId: 1, lastLogin: null },
   'OPERATOR2': { id: 'OPERATOR2', password: 'operator456', role: 'operator', name: 'Оператор 2 - Мария', managerId: 2, lastLogin: null },
   'OPERATOR3': { id: 'OPERATOR3', password: 'operator789', role: 'operator', name: 'Оператор 3 - Иван', managerId: 3, lastLogin: null },
-  
-  // Производство
   'PROD1': { id: 'PROD1', password: 'prod123', role: 'production', name: 'Производство СПБ', lastLogin: null },
   'PROD2': { id: 'PROD2', password: 'prod456', role: 'production', name: 'Партнёр 1', productionId: 2, lastLogin: null },
-  
-  // Клиенты
   'TEST-001': { id: 'TEST-001', password: 'test', role: 'client', name: 'ООО ТехноСтрой', clientId: 'TEST-001', lastLogin: null },
   'TEST-002': { id: 'TEST-002', password: 'test', role: 'client', name: 'ИП Сидоров', clientId: 'TEST-002', lastLogin: null }
 }
@@ -99,8 +92,17 @@ const labelStyle = { fontWeight: '600', display: 'block', marginBottom: 6, fontS
 const sectionStyle = { background: '#fff', padding: 16, borderRadius: 12, marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }
 const buttonPrimaryStyle = { width: '100%', background: '#1976D2', color: '#fff', border: 'none', padding: '14px', borderRadius: 8, fontSize: 15, fontWeight: '600', cursor: 'pointer' }
 
-const loadFromStorage = (key) => { try { const data = localStorage.getItem('food_' + key); return data ? JSON.parse(data) : null } catch (e) { return null } }
-const saveToStorage = (key, data) => { try { localStorage.setItem('food_' + key, JSON.stringify(data)); return true } catch (e) { return false } }
+const loadFromStorage = (key) => { 
+  try { 
+    const data = localStorage.getItem('food_' + key); 
+    return data ? JSON.parse(data) : null 
+  } catch (e) { return null } 
+}
+
+const saveToStorage = (key, data) => { 
+  try { localStorage.setItem('food_' + key, JSON.stringify(data)); return true } 
+  catch (e) { return false } 
+}
 
 function App() {
   const [view, setView] = useState('login')
@@ -136,11 +138,15 @@ function App() {
 
   useEffect(() => {
     const loadData = () => {
+      // Загружаем пользователей -合并 с базовыми
+      const savedUsers = loadFromStorage('users')
+      const mergedUsers = { ...BASE_USERS, ...(savedUsers || {}) }
+      setUsers(mergedUsers)
+      
       setClients(loadFromStorage('clients') || DEFAULT_CLIENTS)
       setOrders(loadFromStorage('orders') || [])
       setBots(loadFromStorage('bots') || DEFAULT_BOTS)
       setThreads(loadFromStorage('threads') || DEFAULT_THREADS)
-      setUsers(loadFromStorage('users') || DEFAULT_USERS)
       setManagers(loadFromStorage('managers') || DEFAULT_MANAGERS)
       setMenus(loadFromStorage('menus') || DEFAULT_MENUS)
       setProductions(loadFromStorage('productions') || DEFAULT_PRODUCTIONS)
@@ -176,43 +182,48 @@ function App() {
   const recordLogin = (userId, userName, role) => {
     const loginRecord = { id: Date.now(), userId, userName, role, loginTime: new Date().toISOString() }
     setLoginHistory(prev => [loginRecord, ...prev].slice(0, 50))
-    
-    // Обновляем lastLogin у пользователя
     setUsers(prev => ({
       ...prev,
-      [userId]: { ...prev[userId], lastLogin: new Date().toISOString() }
+      [userId.toUpperCase()]: { ...prev[userId.toUpperCase()], lastLogin: new Date().toISOString() }
     }))
   }
 
   const handleLogin = (e) => {
     e.preventDefault()
-    const normalized = contractNumber.trim().toUpperCase()
+    const login = contractNumber.trim()
     const pass = password.trim()
+    const loginUpper = login.toUpperCase()
     
-    // Проверяем пользователей системы
-    if (users[normalized] && users[normalized].password === pass) {
-      setCurrentUser(users[normalized])
-      recordLogin(normalized, users[normalized].name, users[normalized].role)
-      addLog('Вход в систему', `Пользователь ${normalized} (${users[normalized].role}) вошёл в систему`)
+    console.log('Login attempt:', loginUpper, 'Password:', pass)
+    console.log('Available users:', Object.keys(users))
+    
+    // Проверяем пользователей системы (без учета регистра для логина)
+    const userKey = Object.keys(users).find(k => k.toUpperCase() === loginUpper)
+    
+    if (userKey && users[userKey].password === pass) {
+      console.log('User found:', users[userKey])
+      setCurrentUser(users[userKey])
+      recordLogin(userKey, users[userKey].name, users[userKey].role)
+      addLog('Вход в систему', `Пользователь ${userKey} (${users[userKey].role}) вошёл в систему`)
       navigate('admin')
       return
     }
     
     // Проверяем клиентов
-    const upperNormalized = normalized.toUpperCase().trim()
-    if (clients[upperNormalized]) {
-      const c = clients[upperNormalized]
+    const clientKey = loginUpper
+    if (clients[clientKey]) {
+      const c = clients[clientKey]
       if (!c.active) { setLoginError('Договор приостановлен'); return }
       
       // Проверяем дополнительные логины клиента
-      const clientLogin = c.userLogins?.find(u => u.login.toUpperCase() === normalized && u.password === pass)
+      const clientLogin = c.userLogins?.find(u => u.login.toUpperCase() === loginUpper && u.password === pass)
       
       if (clientLogin || pass === 'test') {
         setCurrentClient(c)
         setSelectedMeals(c.meals || ['lunch'])
         setSelectedFoodTypes(['regular'])
         setOrderQuantity({ breakfast: c.staff?.regular || 0, lunch: c.staff?.regular || 0, dinner: c.staff?.regular || 0 })
-        recordLogin(upperNormalized, c.company, 'client')
+        recordLogin(clientKey, c.company, 'client')
         addLog('Вход клиента', `Клиент ${c.company} вошёл в систему`)
         setLoginError('')
       } else {
@@ -371,10 +382,6 @@ function App() {
     addLog('Добавлено меню', `Добавлено новое меню ID ${newId}`)
   }
 
-  const saveMenu = (menuId, field, value) => {
-    setMenus(prev => prev.map(m => m.id === menuId ? { ...m, [field]: value } : m))
-  }
-
   const toggleMenuApproved = (menuId) => {
     setMenus(prev => prev.map(m => m.id === menuId ? { ...m, approved: !m.approved } : m))
     addLog('Изменено меню', `Меню ID ${menuId} ${menus.find(m => m.id === menuId)?.approved ? 'откл' : 'одобр'}ено`)
@@ -451,8 +458,6 @@ function App() {
   }
 
   const getManager = (id) => managers.find(m => m.id === id)
-  const getMenu = (id) => menus.find(m => m.id === id)
-  const getProduction = (id) => productions.find(p => p.id === id)
 
   const getFinanceStats = () => {
     const now = new Date()
@@ -501,9 +506,9 @@ function App() {
           ) : (
             <form onSubmit={handleLogin}>
               <label style={labelStyle}>Логин</label>
-              <input type="text" placeholder="Логин (например: 0901SmolAdmin)" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} style={inputStyle} />
+              <input type="text" placeholder="0901SmolAdmin" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} style={inputStyle} />
               <label style={labelStyle}>Пароль</label>
-              <input type="password" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+              <input type="password" placeholder="0901SmolAdmin" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
               {loginError && <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{loginError}</div>}
               <button type="submit" style={buttonPrimaryStyle}>Войти</button>
             </form>
@@ -548,7 +553,7 @@ function App() {
     )
   }
 
-  // === АДМИН / ОПЕРАТОР / ПРОИЗВОДСТВО ===
+  // === АДМИН ===
   if (view === 'admin') {
     const adminTabs = [
       { id: 'clients', name: '🏢 Клиенты' },
