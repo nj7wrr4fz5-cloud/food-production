@@ -65,6 +65,7 @@ const labelStyle = { fontWeight: '500', display: 'block', marginBottom: 4, fontS
 const sectionStyle = { background: '#fff', padding: 16, borderRadius: 10, marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
 const buttonPrimaryStyle = { background: '#1976D2', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 6, fontSize: 13, fontWeight: '500', cursor: 'pointer' }
 const buttonSecondaryStyle = { background: '#f5f5f5', color: '#333', border: '1px solid #ddd', padding: '10px 16px', borderRadius: 6, fontSize: 13, fontWeight: '500', cursor: 'pointer' }
+const buttonDangerStyle = { background: '#f44336', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 6, fontSize: 13, fontWeight: '500', cursor: 'pointer' }
 
 const loadFromStorage = (key) => { try { const data = localStorage.getItem('food_' + key); return data ? JSON.parse(data) : null } catch (e) { return null } }
 const saveToStorage = (key, data) => { try { localStorage.setItem('food_' + key, JSON.stringify(data)); return true } catch (e) { return false } }
@@ -98,6 +99,7 @@ function App() {
   const [editingProduction, setEditingProduction] = useState(null)
   const [editingManager, setEditingManager] = useState(null)
   const [editingMenu, setEditingMenu] = useState(null)
+  const [editingBot, setEditingBot] = useState(null)
   const [selectedRations, setSelectedRations] = useState([])
   const [selectedMenuId, setSelectedMenuId] = useState(null)
   const [orderQuantity, setOrderQuantity] = useState({})
@@ -428,6 +430,54 @@ function App() {
     setNewUserData({ login: '', password: '', name: '', company: '', phone: '' })
   }
 
+  const handleSaveMenu = () => {
+    if (!editingMenu) return
+    
+    const menuData = {
+      ...editingMenu,
+      id: editingMenu.id || Date.now(),
+      managerIds: editingMenu.managerIds || [],
+      productionIds: editingMenu.productionIds || []
+    }
+    
+    const existingIndex = menus.findIndex(m => m.id === menuData.id)
+    if (existingIndex >= 0) {
+      setMenus(prev => prev.map(m => m.id === menuData.id ? menuData : m))
+    } else {
+      setMenus(prev => [...prev, menuData])
+    }
+    setEditingMenu(null)
+    alert('Меню сохранено!')
+  }
+
+  const handleDeleteMenu = (menuId) => {
+    if (!confirm('Удалить меню?')) return
+    setMenus(prev => prev.filter(m => m.id !== menuId))
+  }
+
+  const handleSaveBot = () => {
+    if (!editingBot) return
+    
+    const botData = {
+      ...editingBot,
+      id: editingBot.id || 'bot' + Date.now()
+    }
+    
+    const existingIndex = bots.findIndex(b => b.id === botData.id)
+    if (existingIndex >= 0) {
+      setBots(prev => prev.map(b => b.id === botData.id ? botData : b))
+    } else {
+      setBots(prev => [...prev, botData])
+    }
+    setEditingBot(null)
+    alert('Бот сохранен!')
+  }
+
+  const handleDeleteBot = (botId) => {
+    if (!confirm('Удалить бота?')) return
+    setBots(prev => prev.filter(b => b.id !== botId))
+  }
+
   const finance = getFinanceStats()
 
   if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>Загрузка...</div>
@@ -600,19 +650,6 @@ function App() {
                   )
                 })}
               </div>
-
-              <div style={sectionStyle}>
-                <h3 style={{ marginTop: 0 }}>По клиентам</h3>
-                {Object.values(clients).slice(0, 10).map(c => {
-                  const cStats = getFinanceStats(o => o.clientId === c.id)
-                  return (
-                    <div key={c.id} style={{ padding: 12, background: '#f8f9fa', borderRadius: 8, marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{c.company}</b><span>{cStats.count} заказов</span></div>
-                      <div style={{ fontSize: 12, color: '#666' }}>{cStats.sum.toLocaleString()}₽</div>
-                    </div>
-                  )
-                })}
-              </div>
             </div>
           )}
 
@@ -764,33 +801,38 @@ function App() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ margin: 0 }}>Меню</h2>
-                <button onClick={() => setEditingMenu({ id: Date.now(), name: 'Новое меню', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: false, managerIds: [], productionIds: [], singlePrice: 0 })} style={buttonPrimaryStyle}>+ Добавить</button>
+                <button onClick={() => setEditingMenu({ id: null, name: 'Новое меню', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: false, managerIds: [], productionIds: [], singlePrice: 0 })} style={buttonPrimaryStyle}>+ Добавить меню</button>
               </div>
               
-              {menus.map(menu => (
-                <div key={menu.id} style={{ ...sectionStyle, borderLeft: menu.approved ? '4px solid #43e97b' : '4px solid #f5576c', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 18 }}>{menu.name}</h3>
-                      {menu.singlePrice > 0 && <div style={{ fontSize: 12, color: '#43e97b' }}>Единая цена: {menu.singlePrice}₽ за порцию</div>}
-                      <div style={{ fontSize: 12, color: '#667eea' }}>Менеджеры: {menu.managerIds?.map(id => getManager(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
-                      <div style={{ fontSize: 12, color: '#f5576c' }}>Производства: {menu.productionIds?.map(id => getProduction(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => setMenus(prev => prev.map(m => m.id === menu.id ? {...m, approved: !m.approved} : m))} style={{ padding: '8px 14px', background: menu.approved ? '#f5576c' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{menu.approved ? 'Выкл' : 'Вкл'}</button>
-                      <button onClick={() => setEditingMenu({...menu})} style={buttonSecondaryStyle}>Изменить</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-                    {Object.entries(RATION_TYPES).map(([key, ration]) => (
-                      <div key={key} style={{ padding: 12, background: '#f8f9fa', borderRadius: 10, textAlign: 'center' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ration.name}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#667eea' }}>{menu.rations?.[key]?.price || 0}₽</div>
+              {menus.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Нет меню. Нажмите "+ Добавить меню"</div>
+              ) : (
+                menus.map(menu => (
+                  <div key={menu.id} style={{ ...sectionStyle, borderLeft: menu.approved ? '4px solid #43e97b' : '4px solid #f5576c', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 18 }}>{menu.name}</h3>
+                        {menu.singlePrice > 0 && <div style={{ fontSize: 12, color: '#43e97b' }}>Единая цена: {menu.singlePrice}₽ за порцию</div>}
+                        <div style={{ fontSize: 12, color: '#667eea' }}>Менеджеры: {menu.managerIds?.map(id => getManager(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
+                        <div style={{ fontSize: 12, color: '#f5576c' }}>Производства: {menu.productionIds?.map(id => getProduction(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
                       </div>
-                    ))}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => setMenus(prev => prev.map(m => m.id === menu.id ? {...m, approved: !m.approved} : m))} style={{ padding: '8px 14px', background: menu.approved ? '#f5576c' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{menu.approved ? 'Выкл' : 'Вкл'}</button>
+                        <button onClick={() => setEditingMenu({...menu})} style={{ padding: '8px 14px', background: '#667eea', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Изменить</button>
+                        <button onClick={() => handleDeleteMenu(menu.id)} style={{ padding: '8px 14px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Удалить</button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+                      {Object.entries(RATION_TYPES).map(([key, ration]) => (
+                        <div key={key} style={{ padding: 12, background: '#f8f9fa', borderRadius: 10, textAlign: 'center' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{ration.name}</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: '#667eea' }}>{menu.rations?.[key]?.price || 0}₽</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
@@ -857,24 +899,32 @@ function App() {
               <h2 style={{ marginTop: 0, marginBottom: 20 }}>Telegram</h2>
               <div style={sectionStyle}>
                 <h3 style={{ marginTop: 0 }}>Боты</h3>
-                {bots.map(bot => (
-                  <div key={bot.id} style={{ padding: 14, background: bot.active ? '#E8F5E9' : '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <b>{bot.name}</b>
-                        <span style={{ background: bot.type === 'office' ? '#667eea' : '#f5576c', color: '#fff', padding: '4px 12px', borderRadius: 20, fontSize: 12 }}>{bot.type}</span>
+                {bots.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>Нет ботов. Нажмите "+ Добавить бота"</div>
+                ) : (
+                  bots.map(bot => (
+                    <div key={bot.id} style={{ padding: 14, background: bot.active ? '#E8F5E9' : '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <b>{bot.name}</b>
+                          <span style={{ background: bot.type === 'office' ? '#667eea' : '#f5576c', color: '#fff', padding: '4px 12px', borderRadius: 20, fontSize: 12 }}>{bot.type}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => setEditingBot({...bot})} style={{ padding: '8px 14px', background: '#667eea', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Изменить</button>
+                          <button onClick={() => handleDeleteBot(bot.id)} style={{ padding: '8px 14px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>Удалить</button>
+                          <button onClick={() => setBots(prev => prev.map(b => b.id === bot.id ? {...b, active: !b.active} : b))} style={{ padding: '8px 14px', background: bot.active ? '#f44336' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{bot.active ? 'Выкл' : 'Вкл'}</button>
+                        </div>
                       </div>
-                      <button onClick={() => setBots(prev => prev.map(b => b.id === bot.id ? {...b, active: !b.active} : b))} style={{ padding: '8px 14px', background: bot.active ? '#f44336' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{bot.active ? 'Выкл' : 'Вкл'}</button>
+                      {bot.active && (
+                        <div style={{ marginTop: 10, fontSize: 13, color: '#666' }}>
+                          <div>Token: <code style={{ fontSize: 11 }}>{bot.token?.slice(0, 20)}...</code></div>
+                          <div>Chat ID: {bot.chatId} | Thread: {bot.threadId}</div>
+                        </div>
+                      )}
                     </div>
-                    {bot.active && (
-                      <div style={{ marginTop: 10, fontSize: 13, color: '#666' }}>
-                        <div>Token: <code style={{ fontSize: 11 }}>{bot.token?.slice(0, 20)}...</code></div>
-                        <div>Chat ID: {bot.chatId} | Thread: {bot.threadId}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <button onClick={() => setBots(prev => [...prev, { id: 'bot' + Date.now(), name: 'Новый бот', token: '', chatId: '', active: false, type: 'office', threadId: 0 }])} style={{ ...buttonPrimaryStyle, marginTop: 10 }}>+ Добавить бота</button>
+                  ))
+                )}
+                <button onClick={() => setEditingBot({ id: null, name: 'Новый бот', token: '', chatId: '', active: false, type: 'office', threadId: 0 })} style={{ ...buttonPrimaryStyle, marginTop: 10 }}>+ Добавить бота</button>
               </div>
               
               <div style={sectionStyle}>
@@ -920,7 +970,7 @@ function App() {
         {editingMenu && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 700, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-              <h2 style={{ marginTop: 0 }}>Редактирование меню</h2>
+              <h2 style={{ marginTop: 0 }}>{editingMenu.id ? 'Редактирование меню' : 'Новое меню'}</h2>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
                 <div><label style={labelStyle}>Название:</label><input type="text" value={editingMenu.name} onChange={(e) => setEditingMenu({...editingMenu, name: e.target.value})} style={inputStyle} /></div>
@@ -961,8 +1011,30 @@ function App() {
               </div>
               
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                <button onClick={() => { setMenus(prev => prev.map(m => m.id === editingMenu.id ? editingMenu : [...prev, editingMenu])); setEditingMenu(null); alert('Сохранено!') }} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Сохранить</button>
+                <button onClick={handleSaveMenu} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Сохранить</button>
                 <button onClick={() => setEditingMenu(null)} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {editingBot && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 500, width: '90%' }}>
+              <h2 style={{ marginTop: 0 }}>{editingBot.id ? 'Настройка бота' : 'Новый бот'}</h2>
+              
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div><label style={labelStyle}>Название:</label><input type="text" value={editingBot.name} onChange={(e) => setEditingBot({...editingBot, name: e.target.value})} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Тип:</label><select value={editingBot.type} onChange={(e) => setEditingBot({...editingBot, type: e.target.value})} style={inputStyle}><option value="office">Офис</option><option value="production">Производство</option><option value="clients">Клиенты</option></select></div>
+                <div><label style={labelStyle}>Telegram Token:</label><input type="text" value={editingBot.token} onChange={(e) => setEditingBot({...editingBot, token: e.target.value})} style={inputStyle} placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" /></div>
+                <div><label style={labelStyle}>Chat ID:</label><input type="text" value={editingBot.chatId} onChange={(e) => setEditingBot({...editingBot, chatId: e.target.value})} style={inputStyle} placeholder="-1001234567890" /></div>
+                <div><label style={labelStyle}>Thread ID:</label><input type="number" value={editingBot.threadId || 0} onChange={(e) => setEditingBot({...editingBot, threadId: parseInt(e.target.value) || 0})} style={inputStyle} /></div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                <button onClick={handleSaveBot} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Сохранить</button>
+                <button onClick={() => setEditingBot(null)} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
               </div>
             </div>
           </div>
@@ -1046,9 +1118,7 @@ function App() {
   if (view === 'manager') {
     const myManagerId = currentUser?.managerId
     const myClients = Object.values(clients).filter(c => c.managerId === myManagerId)
-    const myOrders = orders.filter(o => myClients.some(c => c.id === o.clientId))
     const myFinance = getFinanceStats(o => myClients.some(c => c.id === o.clientId))
-
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'system-ui', background: '#f0f2f5' }}>
         <div style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
