@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react'
 
-const COMPANY_TYPES = [
-  { id: 'office', name: 'Офис', emoji: '🏢' },
-  { id: 'plant', name: 'Производство', emoji: '🏭' },
-  { id: 'warehouse', name: 'Склад', emoji: '📦' },
-  { id: 'cafe', name: 'Кафе', emoji: '☕️' }
-]
-
 const CLIENT_TYPES = {
   contract: { id: 'contract', name: 'По договору', emoji: '📋' },
   daily: { id: 'daily', name: 'Ежедневный', emoji: '📅' },
@@ -14,11 +7,11 @@ const CLIENT_TYPES = {
 }
 
 const RATION_TYPES = {
-  breakfast: { id: 'breakfast', name: 'Завтрак', emoji: '🥐', time: '07:30-08:30' },
-  lunch: { id: 'lunch', name: 'Обед', emoji: '🍱', time: '12:00-13:00' },
-  dinner: { id: 'dinner', name: 'Ужин', emoji: '🍽️', time: '17:30-18:30' },
-  night: { id: 'night', name: 'Ночной', emoji: '🌙', time: '23:00-00:00' },
-  snack: { id: 'snack', name: 'Перекус', emoji: '🍪', time: '15:00-16:00' }
+  breakfast: { id: 'breakfast', name: 'Завтрак', emoji: '🥐' },
+  lunch: { id: 'lunch', name: 'Обед', emoji: '🍱' },
+  dinner: { id: 'dinner', name: 'Ужин', emoji: '🍽️' },
+  night: { id: 'night', name: 'Ночной', emoji: '🌙' },
+  snack: { id: 'snack', name: 'Перекус', emoji: '🍪' }
 }
 
 const ORDER_STATUS = {
@@ -28,7 +21,7 @@ const ORDER_STATUS = {
   delivery: { label: '🚚 В доставке', color: '#00BCD4', bg: '#E0F7FA' },
   delivered: { label: '✅ Получен', color: '#4CAF50', bg: '#E8F5E9' },
   cancelled: { label: '❌ Отменён', color: '#f44336', bg: '#FFEBEE' },
-  auto_confirmed: { label: '🤖 Автоподтверждён', color: '#607D8B', bg: '#ECEFF1' }
+  pending: { label: '⏸ На согласовании', color: '#795548', bg: '#EFEBE9' }
 }
 
 const DEFAULT_BOTS = [
@@ -40,10 +33,10 @@ const DEFAULT_BOTS = [
 const DEFAULT_THREADS = { waiting: 360, newUser: 361, history: 362, orders: 359, production: 363, delivery: 364 }
 
 const DEFAULT_MENUS = [
-  { id: 1, name: 'Стандартное', rations: { breakfast: {price: 280, items: 'Каша, чай, хлеб'}, lunch: {price: 420, items: 'Суп, второе, компот'}, dinner: {price: 380, items: 'Второе, салат'}, night: {price: 450, items: 'Перекус'}, snack: {price: 180, items: 'Печенье'} }, active: true, approved: true },
-  { id: 2, name: 'Халяль', rations: { breakfast: {price: 320, items: 'Халяль каша'}, lunch: {price: 480, items: 'Халяль суп'}, dinner: {price: 440, items: 'Халяль блюда'}, night: {price: 500, items: 'Халяль перекус'}, snack: {price: 200, items: 'Халяль печенье'} }, active: true, approved: true },
-  { id: 3, name: 'ПП', rations: { breakfast: {price: 350, items: 'Омлет, овощи'}, lunch: {price: 520, items: 'Салат, курица'}, dinner: {price: 460, items: 'Рыба, овощи'}, night: {price: 380, items: 'Кефир'}, snack: {price: 220, items: 'Фрукты'} }, active: true, approved: true },
-  { id: 4, name: 'Директорат', rations: { breakfast: {price: 420, items: 'Фрукты, кофе'}, lunch: {price: 620, items: 'Мясо, десерт'}, dinner: {price: 560, items: 'Рыба, фрукты'}, night: {price: 600, items: 'Десерт'}, snack: {price: 350, items: 'Десерт'} }, active: true, approved: true }
+  { id: 1, name: 'Стандартное', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: true, managerIds: [1,2,3], productionIds: [1,2,3] },
+  { id: 2, name: 'Халяль', rations: { breakfast: {price: 320}, lunch: {price: 480}, dinner: {price: 440}, night: {price: 500}, snack: {price: 200} }, active: true, approved: true, managerIds: [1,2], productionIds: [1,3] },
+  { id: 3, name: 'ПП', rations: { breakfast: {price: 350}, lunch: {price: 520}, dinner: {price: 460}, night: {price: 380}, snack: {price: 220} }, active: true, approved: true, managerIds: [1], productionIds: [1] },
+  { id: 4, name: 'Директорат', rations: { breakfast: {price: 420}, lunch: {price: 620}, dinner: {price: 560}, night: {price: 600}, snack: {price: 350} }, active: true, approved: true, managerIds: [2,3], productionIds: [1] }
 ]
 
 const DEFAULT_PRODUCTIONS = [
@@ -59,8 +52,8 @@ const DEFAULT_MANAGERS = [
 ]
 
 const DEFAULT_CLIENTS = {
-  'TEST-001': { id: 'TEST-001', company: 'ООО ТехноСтрой', inn: '7812345678', contact: 'Петров Сергей', phone: '+7 (999) 123-45-67', email: 'petrov@tehno.ru', address: 'г. Санкт-Петербург, ул. Новая, д. 10', companyType: 'office', clientType: 'contract', contractDate: '2025-01-15', paymentMethod: 'card', paymentPeriod: 'monthly', paymentDelay: 0, active: true, featured: true, discount: 10, staff: { regular: 45 }, rations: ['lunch'], deliveryTime: { lunch: '12:00-13:00' }, managerId: 1, menuIds: [1, 2], freeLogins: 3, usedLogins: 1, userLogins: [{ login: 'TECHNO1', password: 'tech123', name: 'Петров С.' }], botId: 'bot1', telegramChat: '-1002583331823', telegramThread: 359 },
-  'KOTIK': { id: 'KOTIK', company: 'Котик', inn: '', contact: 'Котик', phone: '+7 (999) 999-99-99', email: '', address: 'СПБ', companyType: 'office', clientType: 'contract', active: true, featured: false, discount: 0, staff: { regular: 10 }, rations: ['lunch'], managerId: 3, menuIds: [1], freeLogins: 1, usedLogins: 0, userLogins: [{ login: 'KOTIK', password: 'kotik123', name: 'Котик' }], botId: 'bot1', telegramChat: '', telegramThread: 0 }
+  'TEST-001': { id: 'TEST-001', company: 'ООО ТехноСтрой', contact: 'Петров Сергей', phone: '+7 (999) 123-45-67', address: 'СПБ, ул. Новая, д. 10', clientType: 'contract', active: true, featured: true, discount: 10, staff: { regular: 45 }, rations: ['lunch'], managerId: 1, menuIds: [1, 2], productionId: 1, userLogins: [{ login: 'TECHNO1', password: 'tech123', name: 'Петров С.' }] },
+  'KOTIK': { id: 'KOTIK', company: 'Котик', contact: 'Котик', phone: '+7 (999) 999-99-99', address: 'СПБ', clientType: 'contract', active: true, featured: false, discount: 0, staff: { regular: 10 }, rations: ['lunch'], managerId: 3, menuIds: [1], productionId: 2, userLogins: [{ login: 'KOTIK', password: 'kotik123', name: 'Котик' }] }
 }
 
 const BASE_USERS = {
@@ -68,7 +61,7 @@ const BASE_USERS = {
   'ADMIN': { id: 'ADMIN', password: 'ADMIN', role: 'admin', name: 'Главный Админ', lastLogin: null }
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 6, border: '1px solid #ddd', marginBottom: 10, boxSizing: 'border-box', background: '#fff' }
+const inputStyle = { width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 6, border: '1px solid #ddd', marginBottom: 10, boxSizing: 'border-box' }
 const labelStyle = { fontWeight: '500', display: 'block', marginBottom: 4, fontSize: 12, color: '#555' }
 const sectionStyle = { background: '#fff', padding: 16, borderRadius: 10, marginBottom: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
 const buttonPrimaryStyle = { background: '#1976D2', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: 6, fontSize: 13, fontWeight: '500', cursor: 'pointer' }
@@ -92,26 +85,26 @@ function App() {
   const [productions, setProductions] = useState([])
   const [orders, setOrders] = useState([])
   const [logs, setLogs] = useState([])
-  const [loginHistory, setLoginHistory] = useState([])
+  const [bots, setBots] = useState([])
+  const [threads, setThreads] = useState(DEFAULT_THREADS)
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterManager, setFilterManager] = useState('all')
+  const [filterClient, setFilterClient] = useState('all')
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [newUserType, setNewUserType] = useState('client')
+  const [newUserData, setNewUserData] = useState({ login: '', password: '', name: '', company: '', phone: '' })
   const [editingClient, setEditingClient] = useState(null)
   const [editingProduction, setEditingProduction] = useState(null)
   const [editingManager, setEditingManager] = useState(null)
   const [editingMenu, setEditingMenu] = useState(null)
   const [selectedRations, setSelectedRations] = useState([])
   const [selectedMenuId, setSelectedMenuId] = useState(null)
-  const [selectedDay, setSelectedDay] = useState('monday')
   const [orderQuantity, setOrderQuantity] = useState({})
-  const [comment, setComment] = useState('')
-  const [bots, setBots] = useState([])
-  const [threads, setThreads] = useState(DEFAULT_THREADS)
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [showAddUser, setShowAddUser] = useState(false)
-  const [newUserType, setNewUserType] = useState('client')
-  const [newUserData, setNewUserData] = useState({ login: '', password: '', name: '', company: '', phone: '' })
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [requestForm, setRequestForm] = useState({ name: '', phone: '', company: '', people: '', message: '' })
+  const [productionComment, setProductionComment] = useState('')
 
   useEffect(() => {
     const loadData = () => {
@@ -143,9 +136,6 @@ function App() {
       const savedLogs = loadFromStorage('logs')
       setLogs(savedLogs || [])
       
-      const savedLoginHistory = loadFromStorage('loginHistory')
-      setLoginHistory(savedLoginHistory || [])
-      
       setLoading(false)
     }
     loadData()
@@ -160,9 +150,8 @@ function App() {
   useEffect(() => { if (!loading && menus.length > 0) saveToStorage('menus', menus) }, [menus, loading])
   useEffect(() => { if (!loading && productions.length > 0) saveToStorage('productions', productions) }, [productions, loading])
   useEffect(() => { if (!loading) saveToStorage('logs', logs) }, [logs, loading])
-  useEffect(() => { if (!loading) saveToStorage('loginHistory', loginHistory) }, [loginHistory, loading])
 
-  const navigate = (page) => { window.location.hash = page; setView(page === 'admin' ? 'admin' : page === 'manager' ? 'manager' : page === 'production' ? 'production' : page === 'new' ? 'new-user' : 'login') }
+  const navigate = (page) => { window.location.hash = page; setView(page) }
 
   const addLog = (action, details) => {
     const newLog = { id: Date.now(), action, details, user: currentUser?.name || currentClient?.company || 'Система', date: new Date().toISOString() }
@@ -170,8 +159,6 @@ function App() {
   }
 
   const recordLogin = (userId, userName, role) => {
-    const loginRecord = { id: Date.now(), userId, userName, role, loginTime: new Date().toISOString() }
-    setLoginHistory(prev => [loginRecord, ...prev].slice(0, 50))
     setUsers(prev => ({ ...prev, [userId.toUpperCase()]: { ...prev[userId.toUpperCase()], lastLogin: new Date().toISOString() } }))
   }
 
@@ -187,7 +174,7 @@ function App() {
       const user = users[userKey]
       setCurrentUser(user)
       recordLogin(userKey, user.name, user.role)
-      addLog('Вход в систему', `Пользователь ${userKey} (${user.role}) вошёл`)
+      addLog('Вход', `${userKey} (${user.role})`)
       
       if (user.role === 'client') {
         const clientData = clients[user.clientId]
@@ -218,7 +205,6 @@ function App() {
         setSelectedMenuId(c.menuIds?.[0] || 1)
         setOrderQuantity({ breakfast: c.staff?.regular || 0, lunch: c.staff?.regular || 0, dinner: c.staff?.regular || 0, night: 0, snack: 0 })
         recordLogin(loginUpper, c.company, 'client')
-        addLog('Вход клиента', `Клиент ${c.company} вошёл`)
         setLoginError('')
       } else {
         setLoginError('Неверный логин или пароль')
@@ -247,34 +233,33 @@ function App() {
       company: currentClient.company,
       address: currentClient.address,
       date: new Date().toISOString().split('T')[0],
-      day: selectedDay,
       rations: selectedRations,
       menuId: selectedMenuId,
       menuName: selectedMenu.name,
-      menuItems: selectedMenu.rations,
       quantity: orderQuantity,
       status: 'created',
       total: calculateOrderTotal(selectedMenu, selectedRations.reduce((acc, r) => ({...acc, [r]: true}), {}), orderQuantity),
-      productionId: null,
+      managerId: currentClient.managerId,
+      productionId: currentClient.productionId,
       createdAt: new Date().toISOString(),
       confirmedAt: null,
       productionAt: null,
       deliveryAt: null,
-      deliveredAt: null
+      deliveredAt: null,
+      productionComment: ''
     }
 
     setOrders(prev => [...prev, newOrder])
-    addLog('Создан заказ', `Клиент ${currentClient.company} создал заказ ${newOrder.orderNumber}`)
-    alert(`Заказ ${newOrder.orderNumber} отправлен на подтверждение!`)
+    addLog('Создан заказ', `${currentClient.company} - ${newOrder.orderNumber}`)
+    alert(`Заказ ${newOrder.orderNumber} отправлен!`)
   }
 
   const cancelOrder = async (orderId) => {
     if (!confirm('Отменить заказ?')) return
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o))
-    addLog('Отменён заказ', `Заказ ${orderId} отменён клиентом`)
   }
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = async (orderId, newStatus, comment = '') => {
     const order = orders.find(o => o.id === orderId)
     const now = new Date().toISOString()
     
@@ -283,9 +268,10 @@ function App() {
     if (newStatus === 'production') updateData.productionAt = now
     if (newStatus === 'delivery') updateData.deliveryAt = now
     if (newStatus === 'delivered') updateData.deliveredAt = now
+    if (comment) updateData.productionComment = comment
     
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updateData } : o))
-    addLog('Статус заказа', `Заказ ${order?.orderNumber} → ${ORDER_STATUS[newStatus]?.label || newStatus}`)
+    addLog('Статус заказа', `${order?.orderNumber} → ${ORDER_STATUS[newStatus]?.label}`)
     
     if (newStatus === 'confirmed') {
       const clientData = clients[order?.clientId]
@@ -307,26 +293,25 @@ function App() {
     
     const bot = bots.find(b => b.active && b.type === 'office')
     if (bot) {
-      const message = `📝 *Новая заявка!*\n\n*Имя:* ${requestForm.name}\n*Телефон:* ${requestForm.phone}\n*Компания:* ${requestForm.company || '-'}\n*Кол-во человек:* ${requestForm.people || '-'}\n*Сообщение:* ${requestForm.message || '-'}`
+      const message = `📝 *Новая заявка!*\n\n*Имя:* ${requestForm.name}\n*Телефон:* ${requestForm.phone}\n*Компания:* ${requestForm.company || '-'}\n*Кол-во человек:* ${requestForm.people || '-'}`
       await fetch(`https://api.telegram.org/bot${bot.token}/sendMessage`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: bot.chatId, text: message, parse_mode: 'Markdown', message_thread_id: threads.newUser })
       })
     }
     
-    alert('Заявка отправлена! Мы свяжемся с вами.')
+    alert('Заявка отправлена!')
     setShowRequestForm(false)
     setRequestForm({ name: '', phone: '', company: '', people: '', message: '' })
   }
 
   const getManager = (id) => managers.find(m => m.id === id)
+  const getProduction = (id) => productions.find(p => p.id === id)
 
-  // ФИНАНСОВАЯ СТАТИСТИКА
   const getFinanceStats = () => {
     const now = new Date()
     const currentMonth = now.getMonth()
     const currentYear = now.getFullYear()
-    
     const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
     const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
     
@@ -345,36 +330,55 @@ function App() {
       return d.getFullYear() === currentYear && o.status !== 'cancelled'
     })
     
-    // Суммы за текущий месяц
-    const thisMonthSum = thisMonthOrders.reduce((s, o) => s + o.total, 0)
-    const thisMonthCancelled = orders.filter(o => {
-      const d = new Date(o.date)
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && o.status === 'cancelled'
-    }).reduce((s, o) => s + o.total, 0)
-    
-    // За прошлый месяц
-    const lastMonthSum = lastMonthOrders.reduce((s, o) => s + o.total, 0)
-    
-    // За год
-    const yearSum = yearOrders.reduce((s, o) => s + o.total, 0)
-    
     return {
-      thisMonth: { count: thisMonthOrders.length, sum: thisMonthSum, cancelled: thisMonthCancelled },
-      lastMonth: { count: lastMonthOrders.length, sum: lastMonthSum },
-      year: { count: yearOrders.length, sum: yearSum },
-      today: { count: thisMonthOrders.filter(o => o.date === now.toISOString().split('T')[0]).length }
+      thisMonth: { count: thisMonthOrders.length, sum: thisMonthOrders.reduce((s, o) => s + o.total, 0), cancelled: orders.filter(o => { const d = new Date(o.date); return d.getMonth() === currentMonth && d.getFullYear() === currentYear && o.status === 'cancelled' }).reduce((s, o) => s + o.total, 0) },
+      lastMonth: { count: lastMonthOrders.length, sum: lastMonthOrders.reduce((s, o) => s + o.total, 0) },
+      year: { count: yearOrders.length, sum: yearOrders.reduce((s, o) => s + o.total, 0) }
     }
   }
 
-  const exportToExcel = (data, filename) => {
-    const headers = Object.keys(data[0] || {}).join('\t')
-    const rows = data.map(row => Object.values(row).join('\t')).join('\n')
-    const blob = new Blob([headers + '\n' + rows], { type: 'text/tab-separated-values' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename + '.tsv'
-    a.click()
+  // УЧЁТ ПРОИЗВОДСТВА
+  const getProductionStats = (productionId) => {
+    const now = new Date()
+    const currentMonth = now.getMonth()
+    const currentYear = now.getFullYear()
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+    
+    const myOrders = orders.filter(o => o.productionId === productionId && o.status !== 'cancelled')
+    
+    const thisMonth = myOrders.filter(o => {
+      const d = new Date(o.date)
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+    })
+    
+    const lastMonthOrders = myOrders.filter(o => {
+      const d = new Date(o.date)
+      return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear
+    })
+    
+    const yearOrders = myOrders.filter(o => {
+      const d = new Date(o.date)
+      return d.getFullYear() === currentYear
+    })
+    
+    // По менеджерам
+    const byManager = {}
+    thisMonth.forEach(o => {
+      const mgr = getManager(o.managerId)
+      const mgrName = mgr?.name || 'Неизвестно'
+      if (!byManager[mgrName]) byManager[mgrName] = { count: 0, sum: 0, portions: 0 }
+      byManager[mgrName].count++
+      byManager[mgrName].sum += o.total
+      Object.values(o.quantity || {}).forEach(q => byManager[mgrName].portions += q)
+    })
+    
+    return {
+      thisMonth: { count: thisMonth.length, sum: thisMonth.reduce((s, o) => s + o.total, 0), portions: thisMonth.reduce((s, o) => s + Object.values(o.quantity || {}).reduce((a, b) => a + b, 0), 0) },
+      lastMonth: { count: lastMonthOrders.length, sum: lastMonthOrders.reduce((s, o) => s + o.total, 0) },
+      year: { count: yearOrders.length, sum: yearOrders.reduce((s, o) => s + o.total, 0) },
+      byManager
+    }
   }
 
   const handleCreateUser = () => {
@@ -398,13 +402,14 @@ function App() {
         staff: { regular: 0 },
         menuIds: [1],
         managerId: 1,
+        productionId: 1,
         active: true,
         featured: false,
         discount: 0,
         userLogins: [{ login: loginUpper, password: newUserData.password, name: newUserData.name }]
       }
       setClients(prev => ({ ...prev, [newClientId]: newClient }))
-      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'client', name: newUserData.company || newUserData.name, clientId: newClientId, lastLogin: null } }))
+      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'client', name: newUserData.company || newUserData.name, clientId: newClientId } }))
       alert(`Клиент создан!\nЛогин: ${loginUpper}\nПароль: ${newUserData.password}`)
     } else if (newUserType === 'production') {
       const newProdId = Date.now()
@@ -423,7 +428,7 @@ function App() {
         telegramThread: 0
       }
       setProductions(prev => [...prev, newProduction])
-      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'production', name: newUserData.company || newUserData.name, productionId: newProdId, lastLogin: null } }))
+      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'production', name: newUserData.company || newUserData.name, productionId: newProdId } }))
       alert(`Производство создано!\nЛогин: ${loginUpper}\nПароль: ${newUserData.password}`)
     } else if (newUserType === 'manager') {
       const newMgrId = Date.now()
@@ -443,13 +448,12 @@ function App() {
         telegramThread: 0
       }
       setManagers(prev => [...prev, newManager])
-      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'operator', name: newUserData.name, managerId: newMgrId, lastLogin: null } }))
+      setUsers(prev => ({ ...prev, [loginUpper]: { id: loginUpper, password: newUserData.password, role: 'operator', name: newUserData.name, managerId: newMgrId } }))
       alert(`Менеджер создан!\nЛогин: ${loginUpper}\nПароль: ${newUserData.password}`)
     }
 
     setShowAddUser(false)
     setNewUserData({ login: '', password: '', name: '', company: '', phone: '' })
-    addLog('Создан пользователь', `${newUserType}: ${loginUpper}`)
   }
 
   const finance = getFinanceStats()
@@ -476,26 +480,24 @@ function App() {
               {loginError && <div style={{ color: '#f44336', marginBottom: 12 }}>{loginError}</div>}
               <button type="submit" style={{ ...buttonPrimaryStyle, width: '100%', padding: 16, fontSize: 16, borderRadius: 10 }}>Войти</button>
             </form>
-            <div style={{ marginTop: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ marginTop: 20, textAlign: 'center' }}>
               <button onClick={() => setShowRequestForm(true)} style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>Оставить заявку</button>
             </div>
           </div>
         </div>
 
-        {/* ФОРМА ЗАЯВКИ */}
         {showRequestForm && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 450, width: '90%' }}>
               <h2 style={{ marginTop: 0, textAlign: 'center' }}>📝 Заявка на питание</h2>
               <div style={{ display: 'grid', gap: 12 }}>
-                <div><label style={labelStyle}>Ваше имя:</label><input type="text" value={requestForm.name} onChange={(e) => setRequestForm({...requestForm, name: e.target.value})} style={inputStyle} placeholder="Иван" /></div>
-                <div><label style={labelStyle}>Телефон:*</label><input type="text" value={requestForm.phone} onChange={(e) => setRequestForm({...requestForm, phone: e.target.value})} style={inputStyle} placeholder="+7 (999) 000-00-00" /></div>
-                <div><label style={labelStyle}>Компания:</label><input type="text" value={requestForm.company} onChange={(e) => setRequestForm({...requestForm, company: e.target.value})} style={inputStyle} placeholder="ООО Название" /></div>
-                <div><label style={labelStyle}>Кол-во человек:</label><input type="number" value={requestForm.people} onChange={(e) => setRequestForm({...requestForm, people: e.target.value})} style={inputStyle} placeholder="10" /></div>
-                <div><label style={labelStyle}>Сообщение:</label><textarea value={requestForm.message} onChange={(e) => setRequestForm({...requestForm, message: e.target.value})} style={{ ...inputStyle, height: 80 }} placeholder="Комментарий..." /></div>
+                <div><label style={labelStyle}>Ваше имя:*</label><input type="text" value={requestForm.name} onChange={(e) => setRequestForm({...requestForm, name: e.target.value})} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Телефон:*</label><input type="text" value={requestForm.phone} onChange={(e) => setRequestForm({...requestForm, phone: e.target.value})} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Компания:</label><input type="text" value={requestForm.company} onChange={(e) => setRequestForm({...requestForm, company: e.target.value})} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Кол-во человек:</label><input type="number" value={requestForm.people} onChange={(e) => setRequestForm({...requestForm, people: e.target.value})} style={inputStyle} /></div>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                <button onClick={sendRequest} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 16 }}>Отправить</button>
+                <button onClick={sendRequest} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отправить</button>
                 <button onClick={() => setShowRequestForm(false)} style={{ flex: 1, padding: 14, background: '#f5f5f5', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
               </div>
             </div>
@@ -505,40 +507,44 @@ function App() {
     )
   }
 
-  // === АДМИН ПАНЕЛЬ ===
+  // === АДМИН ===
   if (view === 'admin') {
     const adminTabs = [
-      { id: 'dashboard', name: '📊', title: 'Обзор' },
-      { id: 'clients', name: '🏢', title: 'Клиенты' },
-      { id: 'users', name: '👥', title: 'Пользователи' },
-      { id: 'orders', name: '📋', title: 'Заказы' },
-      { id: 'waiting', name: '📥', title: 'Ожидание' },
-      { id: 'production', name: '🏭', title: 'Производство' },
-      { id: 'productions', name: '⚙️', title: 'Производства' },
-      { id: 'menu', name: '🍽️', title: 'Меню' },
-      { id: 'finances', name: '💰', title: 'Финансы' },
-      { id: 'managers', name: '👩‍💼', title: 'Менеджеры' },
-      { id: 'telegram', name: '📱', title: 'Telegram' }
+      { id: 'dashboard', name: '📊' },
+      { id: 'clients', name: '🏢' },
+      { id: 'users', name: '👥' },
+      { id: 'orders', name: '📋' },
+      { id: 'waiting', name: '📥' },
+      { id: 'production', name: '🏭' },
+      { id: 'productions', name: '⚙️' },
+      { id: 'menu', name: '🍽️' },
+      { id: 'finances', name: '💰' },
+      { id: 'managers', name: '👩‍💼' },
+      { id: 'telegram', name: '📱' }
     ]
+
+    // ФИЛЬТРАЦИЯ ЗАКАЗОВ
+    const filteredOrders = orders.filter(o => {
+      if (filterStatus !== 'all' && o.status !== filterStatus) return false
+      if (filterManager !== 'all' && o.managerId !== parseInt(filterManager)) return false
+      if (filterClient !== 'all' && o.clientId !== filterClient) return false
+      if (searchQuery && !o.company?.toLowerCase().includes(searchQuery.toLowerCase()) && !o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
+    })
 
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'system-ui', background: '#f0f2f5' }}>
         <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ fontSize: 32 }}>🍽️</div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Питание СПБ</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Админ-панель</div>
-            </div>
+            <div><div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Питание СПБ</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Админ</div></div>
           </div>
           <button onClick={() => { setCurrentUser(null); navigate('login') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', padding: '8px 16px', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>Выход</button>
         </div>
 
         <div style={{ background: '#fff', padding: '10px 24px', borderBottom: '1px solid #eee', overflowX: 'auto', whiteSpace: 'nowrap' }}>
           {adminTabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '10px 18px', border: 'none', borderRadius: 10, background: tab === t.id ? '#667eea' : 'transparent', color: tab === t.id ? '#fff' : '#555', cursor: 'pointer', fontSize: 14, fontWeight: '500', marginRight: 6 }}>
-              {t.name} <span>{t.title}</span>
-            </button>
+            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '10px 18px', border: 'none', borderRadius: 10, background: tab === t.id ? '#667eea' : 'transparent', color: tab === t.id ? '#fff' : '#555', cursor: 'pointer', fontSize: 14, fontWeight: '500', marginRight: 6 }}>{t.name}</button>
           ))}
         </div>
 
@@ -557,8 +563,8 @@ function App() {
                   <div style={{ opacity: 0.9 }}>Новых заказов</div>
                 </div>
                 <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #4facfe, #00f2fe)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{finance.today.count}</div>
-                  <div style={{ opacity: 0.9 }}>Сегодня</div>
+                  <div style={{ fontSize: 36, fontWeight: 700 }}>{finance.thisMonth.count}</div>
+                  <div style={{ opacity: 0.9 }}>Заказов за месяц</div>
                 </div>
                 <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
                   <div style={{ fontSize: 36, fontWeight: 700 }}>{finance.thisMonth.sum.toLocaleString()}₽</div>
@@ -571,7 +577,6 @@ function App() {
           {tab === 'finances' && (
             <div>
               <h2 style={{ marginTop: 0, marginBottom: 20 }}>💰 Финансы</h2>
-              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
                 <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
                   <div style={{ fontSize: 14, opacity: 0.9 }}>Этот месяц</div>
@@ -595,78 +600,9 @@ function App() {
                 <h3 style={{ marginTop: 0 }}>👩‍💼 Менеджеры</h3>
                 {managers.map(mgr => (
                   <div key={mgr.id} style={{ padding: 14, background: '#f8f9fa', borderRadius: 10, marginBottom: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <b>{mgr.name}</b>
-                      <span>Продаж: {mgr.totalSales || 0}</span>
-                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{mgr.name}</b><span>Продаж: {mgr.totalSales || 0}</span></div>
                     <div style={{ fontSize: 13, color: '#666' }}>Выручка: {(mgr.totalRevenue || 0).toLocaleString()}₽</div>
-                    <div style={{ fontSize: 13, color: '#43e97b' }}>Премия: {Math.round((mgr.totalRevenue || 0) * (mgr.bonusPercent || 5) / 100)}₽ ({(mgr.bonusPercent || 5)}%)</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-
-          {tab === 'clients' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ margin: 0 }}>🏢 Клиенты</h2>
-                <button onClick={() => { setNewUserType('client'); setShowAddUser(true) }} style={buttonPrimaryStyle}>+ Добавить</button>
-              </div>
-              <input type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ ...inputStyle, marginBottom: 16, maxWidth: 300 }} />
-              
-              {Object.values(clients).filter(c => !searchQuery || c.company.toLowerCase().includes(searchQuery.toLowerCase())).map(c => {
-                const mgr = getManager(c.managerId)
-                return (
-                  <div key={c.id} style={{ ...sectionStyle, borderLeft: '4px solid #667eea', borderRadius: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
-                        <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
-                        <div style={{ fontSize: 12, color: '#888' }}>📍 {c.address || '-'}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div>👤 Менеджер: <b>{mgr?.name || '-'}</b></div>
-                        <div>👥 <b>{c.staff?.regular || 0}</b> чел.</div>
-                        <button onClick={() => setEditingClient({...c})} style={{ marginTop: 8, padding: '8px 16px', background: '#667eea', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Изменить</button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {tab === 'users' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ margin: 0 }}>👥 Пользователи</h2>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => exportToExcel(Object.values(clients).map(c => ({ ID: c.id, Компания: c.company, Тип: c.clientType, Контакт: c.contact, Телефон: c.phone })), 'clients')} style={buttonSecondaryStyle}>📥 Экспорт</button>
-                </div>
-              </div>
-              
-              <div style={sectionStyle}>
-                <h3 style={{ marginTop: 0 }}>➕ Добавить</h3>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-                  <button onClick={() => { setNewUserType('client'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'client' ? '#667eea' : '#f5f5f5', color: newUserType === 'client' ? '#fff' : '#333', cursor: 'pointer' }}>🏢 Клиент</button>
-                  <button onClick={() => { setNewUserType('production'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'production' ? '#f5576c' : '#f5f5f5', color: newUserType === 'production' ? '#fff' : '#333', cursor: 'pointer' }}>🏭 Производство</button>
-                  <button onClick={() => { setNewUserType('manager'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'manager' ? '#43e97b' : '#f5f5f5', color: newUserType === 'manager' ? '#fff' : '#333', cursor: 'pointer' }}>👩‍💼 Менеджер</button>
-                </div>
-              </div>
-              
-              <div style={sectionStyle}>
-                <h3 style={{ marginTop: 0 }}>🔑 Логины</h3>
-                {Object.values(clients).map(c => (
-                  <div key={c.id} style={{ padding: 12, borderBottom: '1px solid #eee' }}>
-                    <b>{c.company}</b> ({c.id})
-                    {c.userLogins?.map((u, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 12, marginTop: 8, padding: 8, background: '#f8f9fa', borderRadius: 6 }}>
-                        <span style={{ fontFamily: 'monospace', color: '#667eea' }}>{u.login}</span>
-                        <span style={{ color: '#666' }}>{u.password}</span>
-                      </div>
-                    ))}
+                    <div style={{ fontSize: 13, color: '#43e97b' }}>Премия: {Math.round((mgr.totalRevenue || 0) * (mgr.bonusPercent || 5) / 100)}₽</div>
                   </div>
                 ))}
               </div>
@@ -675,51 +611,72 @@ function App() {
 
           {tab === 'orders' && (
             <div>
-              <h2 style={{ marginTop: 0, marginBottom: 20 }}>📋 Заказы ({orders.length})</h2>
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: 'auto', marginBottom: 16 }}>
-                <option value="all">Все статусы</option>
-                {Object.entries(ORDER_STATUS).map(([key, s]) => <option key={key} value={key}>{s.label}</option>)}
-              </select>
+              <h2 style={{ marginTop: 0, marginBottom: 20 }}>📋 Заказы ({filteredOrders.length})</h2>
               
-              {orders.filter(o => filterStatus === 'all' || o.status === filterStatus).slice(0, 30).map(order => (
-                <div key={order.id} style={{ ...sectionStyle, borderLeft: `4px solid ${ORDER_STATUS[order.status]?.color}`, borderRadius: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>{order.orderNumber}</div>
-                      <div style={{ fontSize: 14 }}>{order.company}</div>
-                      <div style={{ fontSize: 12, color: '#888' }}>{order.date} • {order.menuName}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, fontSize: 20 }}>{order.total.toLocaleString()}₽</div>
-                      <span style={{ padding: '4px 12px', background: ORDER_STATUS[order.status]?.bg, color: ORDER_STATUS[order.status]?.color, borderRadius: 20, fontSize: 12 }}>{ORDER_STATUS[order.status]?.label}</span>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                <input type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 150 }} />
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 150 }}>
+                  <option value="all">Все статусы</option>
+                  {Object.entries(ORDER_STATUS).map(([key, s]) => <option key={key} value={key}>{s.label}</option>)}
+                </select>
+                <select value={filterManager} onChange={(e) => setFilterManager(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 150 }}>
+                  <option value="all">Все менеджеры</option>
+                  {managers.map(mgr => <option key={mgr.id} value={mgr.id}>{mgr.name}</option>)}
+                </select>
+                <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 150 }}>
+                  <option value="all">Все клиенты</option>
+                  {Object.values(clients).map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
+                </select>
+              </div>
+              
+              {filteredOrders.slice(0, 30).map(order => {
+                const mgr = getManager(order.managerId)
+                const prod = getProduction(order.productionId)
+                return (
+                  <div key={order.id} style={{ ...sectionStyle, borderLeft: `4px solid ${ORDER_STATUS[order.status]?.color}`, borderRadius: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 16 }}>{order.orderNumber}</div>
+                        <div style={{ fontSize: 14 }}>{order.company}</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>{order.date} • {order.menuName}</div>
+                        <div style={{ fontSize: 12, color: '#667eea' }}>👤 {mgr?.name || '-'} | 🏭 {prod?.name || '-'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 700, fontSize: 20 }}>{order.total.toLocaleString()}₽</div>
+                        <span style={{ padding: '4px 12px', background: ORDER_STATUS[order.status]?.bg, color: ORDER_STATUS[order.status]?.color, borderRadius: 20, fontSize: 12 }}>{ORDER_STATUS[order.status]?.label}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
           {tab === 'waiting' && (
             <div>
               <h2 style={{ marginTop: 0, marginBottom: 20 }}>📥 Ожидают ({orders.filter(o => o.status === 'created').length})</h2>
-              {orders.filter(o => o.status === 'created').map(order => (
-                <div key={order.id} style={{ ...sectionStyle, borderLeft: '4px solid #f5576c', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>{order.orderNumber}</div>
-                      <div>{order.company}</div>
-                      <div style={{ fontSize: 12, color: '#666' }}>📍 {order.address}</div>
+              {orders.filter(o => o.status === 'created').map(order => {
+                const mgr = getManager(order.managerId)
+                return (
+                  <div key={order.id} style={{ ...sectionStyle, borderLeft: '4px solid #f5576c', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 16 }}>{order.orderNumber}</div>
+                        <div>{order.company}</div>
+                        <div style={{ fontSize: 12, color: '#667eea' }}>👤 Менеджер: {mgr?.name || '-'}</div>
+                        <div style={{ fontSize: 12, color: '#666' }}>📍 {order.address}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 700, fontSize: 20, color: '#f5576c' }}>{order.total.toLocaleString()}₽</div>
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, fontSize: 20, color: '#f5576c' }}>{order.total.toLocaleString()}₽</div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                      <button onClick={() => updateOrderStatus(order.id, 'confirmed')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600 }}>✓ Подтвердить</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'cancelled')} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600 }}>✕ Отклонить</button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                    <button onClick={() => updateOrderStatus(order.id, 'confirmed')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600 }}>✓ Подтвердить</button>
-                    <button onClick={() => updateOrderStatus(order.id, 'cancelled')} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600 }}>✕ Отклонить</button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -743,6 +700,88 @@ function App() {
                     {order.status === 'confirmed' && <button onClick={() => updateOrderStatus(order.id, 'production')} style={{ flex: 1, padding: 14, background: '#9C27B0', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🏭 Принять</button>}
                     {order.status === 'production' && <button onClick={() => updateOrderStatus(order.id, 'delivery')} style={{ flex: 1, padding: 14, background: '#4facfe', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🚚 Отправить</button>}
                     {order.status === 'delivery' && <button onClick={() => updateOrderStatus(order.id, 'delivered')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>✅ Доставлен</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'clients' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ margin: 0 }}>🏢 Клиенты</h2>
+                <button onClick={() => { setNewUserType('client'); setShowAddUser(true) }} style={buttonPrimaryStyle}>+ Добавить</button>
+              </div>
+              <input type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ ...inputStyle, marginBottom: 16, maxWidth: 300 }} />
+              
+              {Object.values(clients).filter(c => !searchQuery || c.company.toLowerCase().includes(searchQuery.toLowerCase())).map(c => {
+                const mgr = getManager(c.managerId)
+                const prod = getProduction(c.productionId)
+                const clientMenus = menus.filter(m => m.approved && m.managerIds?.includes(c.managerId))
+                return (
+                  <div key={c.id} style={{ ...sectionStyle, borderLeft: '4px solid #667eea', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
+                        <div style={{ fontSize: 13, color: '#666' }}>{c.id} • {c.contact} • {c.phone}</div>
+                        <div style={{ fontSize: 12, color: '#667eea' }}>👤 {mgr?.name || '-'} | 🏭 {prod?.name || '-'}</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>🍽️ Меню: {clientMenus.map(m => m.name).join(', ') || '-'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div>👥 <b>{c.staff?.regular || 0}</b> чел.</div>
+                        <button onClick={() => setEditingClient({...c})} style={{ marginTop: 8, padding: '8px 16px', background: '#667eea', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Изменить</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {tab === 'users' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ margin: 0 }}>👥 Пользователи</h2>
+              </div>
+              
+              <div style={sectionStyle}>
+                <h3 style={{ marginTop: 0 }}>➕ Добавить</h3>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                  <button onClick={() => { setNewUserType('client'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'client' ? '#667eea' : '#f5f5f5', color: newUserType === 'client' ? '#fff' : '#333', cursor: 'pointer' }}>🏢 Клиент</button>
+                  <button onClick={() => { setNewUserType('production'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'production' ? '#f5576c' : '#f5f5f5', color: newUserType === 'production' ? '#fff' : '#333', cursor: 'pointer' }}>🏭 Производство</button>
+                  <button onClick={() => { setNewUserType('manager'); setShowAddUser(true) }} style={{ padding: '12px 20px', border: 'none', borderRadius: 10, background: newUserType === 'manager' ? '#43e97b' : '#f5f5f5', color: newUserType === 'manager' ? '#fff' : '#333', cursor: 'pointer' }}>👩‍💼 Менеджер</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'menu' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h2 style={{ margin: 0 }}>🍽️ Меню</h2>
+                <button onClick={() => setEditingMenu({ id: Date.now(), name: 'Новое меню', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: false, managerIds: [], productionIds: [] })} style={buttonPrimaryStyle}>+ Добавить</button>
+              </div>
+              
+              {menus.map(menu => (
+                <div key={menu.id} style={{ ...sectionStyle, borderLeft: menu.approved ? '4px solid #43e97b' : '4px solid #f5576c', borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 18 }}>🍽️ {menu.name}</h3>
+                      <div style={{ fontSize: 12, color: '#667eea' }}>👤 Менеджеры: {menu.managerIds?.map(id => getManager(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
+                      <div style={{ fontSize: 12, color: '#f5576c' }}>🏭 Производства: {menu.productionIds?.map(id => getProduction(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button onClick={() => setMenus(prev => prev.map(m => m.id === menu.id ? {...m, approved: !m.approved} : m))} style={{ padding: '8px 14px', background: menu.approved ? '#f5576c' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{menu.approved ? 'Выкл' : 'Вкл'}</button>
+                      <button onClick={() => setEditingMenu({...menu})} style={buttonSecondaryStyle}>Изменить</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+                    {Object.entries(RATION_TYPES).map(([key, ration]) => (
+                      <div key={key} style={{ padding: 12, background: '#f8f9fa', borderRadius: 10, textAlign: 'center' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ration.emoji} {ration.name}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#667eea' }}>{menu.rations?.[key]?.price || 0}₽</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -786,38 +825,6 @@ function App() {
             </div>
           )}
 
-          {tab === 'menu' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                <h2 style={{ margin: 0 }}>🍽️ Меню</h2>
-                <button onClick={() => setEditingMenu({ id: Date.now(), name: 'Новое меню', rations: { breakfast: {price: 280, items: ''}, lunch: {price: 420, items: ''}, dinner: {price: 380, items: ''}, night: {price: 450, items: ''}, snack: {price: 180, items: ''} }, active: true, approved: false })} style={buttonPrimaryStyle}>+ Добавить</button>
-              </div>
-              
-              {menus.map(menu => (
-                <div key={menu.id} style={{ ...sectionStyle, borderLeft: menu.approved ? '4px solid #43e97b' : '4px solid #f5576c', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 18 }}>🍽️ {menu.name}</h3>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => setMenus(prev => prev.map(m => m.id === menu.id ? {...m, approved: !m.approved} : m))} style={{ padding: '8px 14px', background: menu.approved ? '#f5576c' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{menu.approved ? 'Выкл' : 'Вкл'}</button>
-                      <button onClick={() => setEditingMenu({...menu})} style={buttonSecondaryStyle}>Изменить</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-                    {Object.entries(RATION_TYPES).map(([key, ration]) => (
-                      <div key={key} style={{ padding: 12, background: '#f8f9fa', borderRadius: 10 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{ration.emoji} {ration.name}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#667eea' }}>{menu.rations?.[key]?.price || 0}₽</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-
           {tab === 'managers' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -854,8 +861,26 @@ function App() {
                       </div>
                       <button onClick={() => setBots(prev => prev.map(b => b.id === bot.id ? {...b, active: !b.active} : b))} style={{ padding: '8px 14px', background: bot.active ? '#f44336' : '#43e97b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{bot.active ? 'Выкл' : 'Вкл'}</button>
                     </div>
+                    {bot.active && (
+                      <div style={{ marginTop: 10, fontSize: 13, color: '#666' }}>
+                        <div>Token: <code style={{ fontSize: 11 }}>{bot.token?.slice(0, 20)}...</code></div>
+                        <div>Chat ID: {bot.chatId} • Thread: {bot.threadId}</div>
+                      </div>
+                    )}
                   </div>
                 ))}
+                <button onClick={() => setBots(prev => [...prev, { id: 'bot' + Date.now(), name: 'Новый бот', token: '', chatId: '', active: false, type: 'office', threadId: 0 }])} style={{ ...buttonPrimaryStyle, marginTop: 10 }}>+ Добавить бота</button>
+              </div>
+              
+              <div style={sectionStyle}>
+                <h3 style={{ marginTop: 0 }}>📨 Темы (Threads)</h3>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div><label style={labelStyle}>Ожидание заказов:</label><input type="number" value={threads.waiting} onChange={(e) => setThreads({...threads, waiting: parseInt(e.target.value)})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Новые заявки:</label><input type="number" value={threads.newUser} onChange={(e) => setThreads({...threads, newUser: parseInt(e.target.value)})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>История:</label><input type="number" value={threads.history} onChange={(e) => setThreads({...threads, history: parseInt(e.target.value)})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Заказы:</label><input type="number" value={threads.orders} onChange={(e) => setThreads({...threads, orders: parseInt(e.target.value)})} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Производство:</label><input type="number" value={threads.production} onChange={(e) => setThreads({...threads, production: parseInt(e.target.value)})} style={inputStyle} /></div>
+                </div>
               </div>
             </div>
           )}
@@ -887,6 +912,56 @@ function App() {
           </div>
         )}
 
+        {editingMenu && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+            <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 700, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
+              <h2 style={{ marginTop: 0 }}>Редактирование меню</h2>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
+                <div><label style={labelStyle}>Название:</label><input type="text" value={editingMenu.name} onChange={(e) => setEditingMenu({...editingMenu, name: e.target.value})} style={inputStyle} /></div>
+              </div>
+              
+              <h4 style={{ marginTop: 20 }}>💰 Цены:</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+                {Object.entries(RATION_TYPES).map(([key, ration]) => (
+                  <div key={key}><label style={labelStyle}>{ration.emoji} {ration.name}:</label><input type="number" value={editingMenu.rations?.[key]?.price || 0} onChange={(e) => setEditingMenu({...editingMenu, rations: { ...editingMenu.rations, [key]: { ...editingMenu.rations?.[key], price: parseInt(e.target.value) }}})} style={inputStyle} /></div>
+                ))}
+              </div>
+              
+              <h4 style={{ marginTop: 20 }}>👤 Менеджеры (кто может предлагать это меню):</h4>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {managers.map(mgr => (
+                  <label key={mgr.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: editingMenu.managerIds?.includes(mgr.id) ? '#667eea' : '#f5f5f5', color: editingMenu.managerIds?.includes(mgr.id) ? '#fff' : '#333', borderRadius: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editingMenu.managerIds?.includes(mgr.id)} onChange={(e) => {
+                      const ids = editingMenu.managerIds || []
+                      setEditingMenu({...editingMenu, managerIds: e.target.checked ? [...ids, mgr.id] : ids.filter(id => id !== mgr.id)})
+                    }} style={{ display: 'none' }} />
+                    {mgr.name}
+                  </label>
+                ))}
+              </div>
+              
+              <h4 style={{ marginTop: 20 }}>🏭 Производства (кто может готовить):</h4>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {productions.map(prod => (
+                  <label key={prod.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: editingMenu.productionIds?.includes(prod.id) ? '#f5576c' : '#f5f5f5', color: editingMenu.productionIds?.includes(prod.id) ? '#fff' : '#333', borderRadius: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editingMenu.productionIds?.includes(prod.id)} onChange={(e) => {
+                      const ids = editingMenu.productionIds || []
+                      setEditingMenu({...editingMenu, productionIds: e.target.checked ? [...ids, prod.id] : ids.filter(id => id !== prod.id)})
+                    }} style={{ display: 'none' }} />
+                    {prod.name}
+                  </label>
+                ))}
+              </div>
+              
+              <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                <button onClick={() => { setMenus(prev => prev.map(m => m.id === editingMenu.id ? editingMenu : [...prev, editingMenu])); setEditingMenu(null); alert('Сохранено!') }} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>💾 Сохранить</button>
+                <button onClick={() => setEditingMenu(null)} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {editingClient && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 700, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
@@ -894,12 +969,13 @@ function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div><label style={labelStyle}>ID:</label><input type="text" value={editingClient.id} onChange={(e) => setEditingClient({...editingClient, id: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Компания:</label><input type="text" value={editingClient.company} onChange={(e) => setEditingClient({...editingClient, company: e.target.value})} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Тип:</label><select value={editingClient.clientType || 'contract'} onChange={(e) => setEditingClient({...editingClient, clientType: e.target.value})} style={inputStyle}>{Object.entries(CLIENT_TYPES).map(([k,v]) => <option key={k} value={k}>{v.emoji} {v.name}</option>)}</select></div>
                 <div><label style={labelStyle}>Контакт:</label><input type="text" value={editingClient.contact} onChange={(e) => setEditingClient({...editingClient, contact: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Телефон:</label><input type="text" value={editingClient.phone} onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Адрес:</label><input type="text" value={editingClient.address || ''} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Сотрудников:</label><input type="number" value={editingClient.staff?.regular || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, regular: parseInt(e.target.value) || 0 }})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Менеджер:</label><select value={editingClient.managerId || 1} onChange={(e) => setEditingClient({...editingClient, managerId: parseInt(e.target.value)})} style={inputStyle}>{managers.map(mgr => <option key={mgr.id} value={mgr.id}>{mgr.name}</option>)}</select></div>
+                <div><label style={labelStyle}>Производство:</label><select value={editingClient.productionId || 1} onChange={(e) => setEditingClient({...editingClient, productionId: parseInt(e.target.value)})} style={inputStyle}>{productions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                <div><label style={labelStyle}>Меню:</label><select value={editingClient.menuIds?.[0] || 1} onChange={(e) => setEditingClient({...editingClient, menuIds: [parseInt(e.target.value)]})} style={inputStyle}>{menus.filter(m => m.approved).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
                 <div><label style={labelStyle}>Скидка (%):</label><input type="number" value={editingClient.discount || 0} onChange={(e) => setEditingClient({...editingClient, discount: parseInt(e.target.value) || 0})} style={inputStyle} /></div>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
@@ -935,28 +1011,6 @@ function App() {
           </div>
         )}
 
-        {editingMenu && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 700, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-              <h2 style={{ marginTop: 0 }}>Редактирование меню</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div><label style={labelStyle}>Название:</label><input type="text" value={editingMenu.name} onChange={(e) => setEditingMenu({...editingMenu, name: e.target.value})} style={inputStyle} /></div>
-              </div>
-              <h4 style={{ marginTop: 20 }}>💰 Цены:</h4>
-              {Object.entries(RATION_TYPES).map(([key, ration]) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div style={{ fontWeight: 500 }}>{ration.emoji} {ration.name}</div>
-                  <input type="number" value={editingMenu.rations?.[key]?.price || 0} onChange={(e) => setEditingMenu({...editingMenu, rations: { ...editingMenu.rations, [key]: { ...editingMenu.rations?.[key], price: parseInt(e.target.value) }}})} style={inputStyle} />
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                <button onClick={() => { setMenus(prev => prev.map(m => m.id === editingMenu.id ? editingMenu : m)); setEditingMenu(null); alert('Сохранено!') }} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>💾 Сохранить</button>
-                <button onClick={() => setEditingMenu(null)} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {editingManager && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <div style={{ background: '#fff', padding: 28, borderRadius: 20, maxWidth: 600, width: '90%' }}>
@@ -984,132 +1038,51 @@ function App() {
 
   // === ПАНЕЛЬ МЕНЕДЖЕРА ===
   if (view === 'manager') {
-    const managerTabs = [
-      { id: 'dashboard', name: '📊' },
-      { id: 'clients', name: '🏢' },
-      { id: 'orders', name: '📋' },
-      { id: 'waiting', name: '📥' }
-    ]
-
     const myManagerId = currentUser?.managerId
     const myClients = Object.values(clients).filter(c => c.managerId === myManagerId)
     const myOrders = orders.filter(o => myClients.some(c => c.id === o.clientId))
     const myFinance = {
-      thisMonth: myOrders.filter(o => {
-        const d = new Date(o.date)
-        const now = new Date()
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && o.status !== 'cancelled'
-      }).reduce((s, o) => s + o.total, 0),
-      lastMonth: myOrders.filter(o => {
-        const d = new Date(o.date)
-        const now = new Date()
-        const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
-        const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-        return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear && o.status !== 'cancelled'
-      }).reduce((s, o) => s + o.total, 0)
+      thisMonth: myOrders.filter(o => { const d = new Date(o.date); const now = new Date(); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && o.status !== 'cancelled' }).reduce((s, o) => s + o.total, 0),
+      lastMonth: myOrders.filter(o => { const d = new Date(o.date); const now = new Date(); const lm = now.getMonth() === 0 ? 11 : now.getMonth() - 1; const ly = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(); return d.getMonth() === lm && d.getFullYear() === ly && o.status !== 'cancelled' }).reduce((s, o) => s + o.total, 0)
     }
 
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'system-ui', background: '#f0f2f5' }}>
         <div style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ fontSize: 32 }}>👩‍💼</div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Панель менеджера</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{currentUser?.name}</div>
-            </div>
-          </div>
+          <div><div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Панель менеджера</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{currentUser?.name}</div></div>
           <button onClick={() => { setCurrentUser(null); navigate('login') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', padding: '8px 16px', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>Выход</button>
         </div>
 
-        <div style={{ background: '#fff', padding: '10px 24px', borderBottom: '1px solid #eee', overflowX: 'auto' }}>
-          {managerTabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '10px 18px', border: 'none', borderRadius: 10, background: tab === t.id ? '#43e97b' : 'transparent', color: tab === t.id ? '#fff' : '#555', cursor: 'pointer', fontSize: 14, fontWeight: '500', marginRight: 6 }}>{t.name}</button>
-          ))}
-        </div>
+        <div style={{ padding: 24 }}>
+          <h2 style={{ marginTop: 0 }}>📊 Обзор</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 36, fontWeight: 700 }}>{myClients.length}</div>
+              <div style={{ opacity: 0.9 }}>Мои клиенты</div>
+            </div>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 36, fontWeight: 700 }}>{myFinance.thisMonth.toLocaleString()}₽</div>
+              <div style={{ opacity: 0.9 }}>За месяц</div>
+            </div>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #f093fb, #f5576c)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 36, fontWeight: 700 }}>{myFinance.lastMonth.toLocaleString()}₽</div>
+              <div style={{ opacity: 0.9 }}>Прошлый месяц</div>
+            </div>
+          </div>
 
-        <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-          {tab === 'dashboard' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>📊 Обзор</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
-                <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{myClients.length}</div>
-                  <div style={{ opacity: 0.9 }}>Мои клиенты</div>
+          <h2>🏢 Мои клиенты</h2>
+          {myClients.map(c => (
+            <div key={c.id} style={{ ...sectionStyle, borderLeft: '4px solid #43e97b', borderRadius: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
+                  <div style={{ fontSize: 13, color: '#666' }}>{c.contact} • {c.phone}</div>
+                  <div style={{ fontSize: 12, color: '#888' }}>👥 {c.staff?.regular || 0} чел.</div>
                 </div>
-                <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{myFinance.thisMonth.toLocaleString()}₽</div>
-                  <div style={{ opacity: 0.9 }}>За месяц</div>
-                </div>
-                <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #f093fb, #f5576c)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{myFinance.lastMonth.toLocaleString()}₽</div>
-                  <div style={{ opacity: 0.9 }}>Прошлый месяц</div>
-                </div>
+                <button onClick={() => setEditingClient({...c})} style={buttonSecondaryStyle}>Изменить</button>
               </div>
             </div>
-          )}
-
-          {tab === 'clients' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>🏢 Мои клиенты</h2>
-              {myClients.map(c => (
-                <div key={c.id} style={{ ...sectionStyle, borderLeft: '4px solid #43e97b', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 18 }}>{c.company}</h3>
-                      <div style={{ fontSize: 13, color: '#666' }}>{c.contact} • {c.phone}</div>
-                      <div style={{ fontSize: 12, color: '#888' }}>👥 {c.staff?.regular || 0} чел.</div>
-                    </div>
-                    <button onClick={() => setEditingClient({...c})} style={buttonSecondaryStyle}>Изменить</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === 'orders' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>📋 Заказы</h2>
-              {myOrders.slice(0, 20).map(order => (
-                <div key={order.id} style={{ ...sectionStyle, borderLeft: `4px solid ${ORDER_STATUS[order.status]?.color}`, borderRadius: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{order.orderNumber}</div>
-                      <div>{order.company}</div>
-                      <div style={{ fontSize: 12, color: '#888' }}>{order.date}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700 }}>{order.total.toLocaleString()}₽</div>
-                      <span style={{ padding: '4px 12px', background: ORDER_STATUS[order.status]?.bg, color: ORDER_STATUS[order.status]?.color, borderRadius: 20, fontSize: 12 }}>{ORDER_STATUS[order.status]?.label}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {tab === 'waiting' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>📥 Ожидают ({myOrders.filter(o => o.status === 'created').length})</h2>
-              {myOrders.filter(o => o.status === 'created').map(order => (
-                <div key={order.id} style={{ ...sectionStyle, borderLeft: '4px solid #f5576c', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{order.orderNumber}</div>
-                      <div>{order.company}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, color: '#f5576c' }}>{order.total.toLocaleString()}₽</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                    <button onClick={() => updateOrderStatus(order.id, 'confirmed')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>✓ Подтвердить</button>
-                    <button onClick={() => updateOrderStatus(order.id, 'cancelled')} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>✕ Отклонить</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
 
         {editingClient && (
@@ -1122,6 +1095,7 @@ function App() {
                 <div><label style={labelStyle}>Телефон:</label><input type="text" value={editingClient.phone} onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Адрес:</label><input type="text" value={editingClient.address || ''} onChange={(e) => setEditingClient({...editingClient, address: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Сотрудников:</label><input type="number" value={editingClient.staff?.regular || 0} onChange={(e) => setEditingClient({...editingClient, staff: { ...editingClient.staff, regular: parseInt(e.target.value) || 0 }})} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Меню:</label><select value={editingClient.menuIds?.[0] || 1} onChange={(e) => setEditingClient({...editingClient, menuIds: [parseInt(e.target.value)]})} style={inputStyle}>{menus.filter(m => m.approved && m.managerIds?.includes(myManagerId)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                 <button onClick={() => { setClients(prev => ({...prev, [editingClient.id]: editingClient})); setEditingClient(null); alert('Сохранено!') }} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>💾 Сохранить</button>
@@ -1136,75 +1110,77 @@ function App() {
 
   // === ПАНЕЛЬ ПРОИЗВОДСТВА ===
   if (view === 'production') {
-    const productionTabs = [
-      { id: 'dashboard', name: '📊' },
-      { id: 'orders', name: '📋' }
-    ]
-
     const myProductionId = currentUser?.productionId
-    const myProductionOrders = orders.filter(o => o.productionId === myProductionId || !o.productionId)
+    const prodStats = getProductionStats(myProductionId)
 
     return (
       <div style={{ minHeight: '100vh', fontFamily: 'system-ui', background: '#f0f2f5' }}>
         <div style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ fontSize: 32 }}>🏭</div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Производство</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{currentUser?.name}</div>
-            </div>
-          </div>
+          <div><div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Производство</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{currentUser?.name}</div></div>
           <button onClick={() => { setCurrentUser(null); navigate('login') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', padding: '8px 16px', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>Выход</button>
         </div>
 
-        <div style={{ background: '#fff', padding: '10px 24px', borderBottom: '1px solid #eee' }}>
-          {productionTabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '10px 18px', border: 'none', borderRadius: 10, background: tab === t.id ? '#f5576c' : 'transparent', color: tab === t.id ? '#fff' : '#555', cursor: 'pointer', fontSize: 14, fontWeight: '500', marginRight: 6 }}>{t.name}</button>
-          ))}
-        </div>
-
         <div style={{ padding: 24 }}>
-          {tab === 'dashboard' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>📊 Обзор</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-                <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #f093fb, #f5576c)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{myProductionOrders.filter(o => o.status === 'production').length}</div>
-                  <div style={{ opacity: 0.9 }}>В работе</div>
+          <h2 style={{ marginTop: 0 }}>📊 Учёт</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #f093fb, #f5576c)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Этот месяц</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{prodStats.thisMonth.sum.toLocaleString()}₽</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>{prodStats.thisMonth.count} заказов</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>{prodStats.thisMonth.portions} порций</div>
+            </div>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>Прошлый месяц</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{prodStats.lastMonth.sum.toLocaleString()}₽</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>{prodStats.lastMonth.count} заказов</div>
+            </div>
+            <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
+              <div style={{ fontSize: 14, opacity: 0.9 }}>За год</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{prodStats.year.sum.toLocaleString()}₽</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>{prodStats.year.count} заказов</div>
+            </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <h3 style={{ marginTop: 0 }}>👤 По менеджерам (этот месяц)</h3>
+            {Object.entries(prodStats.byManager).map(([mgrName, data]) => (
+              <div key={mgrName} style={{ padding: 12, background: '#f8f9fa', borderRadius: 10, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><b>{mgrName}</b><span>{data.count} заказов</span></div>
+                <div style={{ fontSize: 13, color: '#666' }}>Сумма: {data.sum.toLocaleString()}₽ | Порций: {data.portions}</div>
+              </div>
+            ))}
+          </div>
+
+          <h2>📋 Заказы</h2>
+          {orders.filter(o => o.productionId === myProductionId && ['confirmed', 'production', 'delivery', 'pending'].includes(o.status)).map(order => {
+            const mgr = getManager(order.managerId)
+            return (
+              <div key={order.id} style={{ ...sectionStyle, borderLeft: '4px solid #f5576c', borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{order.orderNumber}</div>
+                    <div>{order.company}</div>
+                    <div style={{ fontSize: 12, color: '#667eea' }}>👤 {mgr?.name || '-'}</div>
+                    <div style={{ fontSize: 12, color: '#666' }}>{order.menuName}</div>
+                    {order.productionComment && <div style={{ fontSize: 12, color: '#f5576c', marginTop: 4 }}>💬 {order.productionComment}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 700 }}>{order.total.toLocaleString()}₽</div>
+                    <span style={{ padding: '4px 12px', background: ORDER_STATUS[order.status]?.bg, color: ORDER_STATUS[order.status]?.color, borderRadius: 20, fontSize: 12 }}>{ORDER_STATUS[order.status]?.label}</span>
+                  </div>
                 </div>
-                <div style={{ ...sectionStyle, background: 'linear-gradient(135deg, #4facfe, #00f2fe)', color: '#fff', padding: 24, textAlign: 'center', borderRadius: 16 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700 }}>{myProductionOrders.filter(o => o.status === 'delivery').length}</div>
-                  <div style={{ opacity: 0.9 }}>В доставке</div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                  {order.status === 'confirmed' && <button onClick={() => updateOrderStatus(order.id, 'production')} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🏭 Принять</button>}
+                  {order.status === 'production' && <button onClick={() => updateOrderStatus(order.id, 'delivery')} style={{ flex: 1, padding: 14, background: '#4facfe', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🚚 Отправить</button>}
+                  {order.status === 'delivery' && <button onClick={() => updateOrderStatus(order.id, 'delivered')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>✅ Доставлен</button>}
+                  {order.status === 'confirmed' && <button onClick={() => {
+                    const comment = prompt('Комментарий для отмены:')
+                    if (comment) updateOrderStatus(order.id, 'cancelled', comment)
+                  }} style={{ flex: 1, padding: 14, background: '#f44336', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>❌ Отклонить</button>}
                 </div>
               </div>
-            </div>
-          )}
-
-          {tab === 'orders' && (
-            <div>
-              <h2 style={{ marginTop: 0 }}>📋 Заказы</h2>
-              {myProductionOrders.filter(o => ['confirmed', 'production', 'delivery'].includes(o.status)).map(order => (
-                <div key={order.id} style={{ ...sectionStyle, borderLeft: '4px solid #f5576c', borderRadius: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{order.orderNumber}</div>
-                      <div>{order.company}</div>
-                      <div style={{ fontSize: 12, color: '#666' }}>{order.menuName}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700 }}>{order.total.toLocaleString()}₽</div>
-                      <span style={{ padding: '4px 12px', background: ORDER_STATUS[order.status]?.bg, color: ORDER_STATUS[order.status]?.color, borderRadius: 20, fontSize: 12 }}>{ORDER_STATUS[order.status]?.label}</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                    {order.status === 'confirmed' && <button onClick={() => updateOrderStatus(order.id, 'production')} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🏭 Принять</button>}
-                    {order.status === 'production' && <button onClick={() => updateOrderStatus(order.id, 'delivery')} style={{ flex: 1, padding: 14, background: '#4facfe', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>🚚 Отправить</button>}
-                    {order.status === 'delivery' && <button onClick={() => updateOrderStatus(order.id, 'delivered')} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>✅ Доставлен</button>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            )
+          })}
         </div>
       </div>
     )
@@ -1214,10 +1190,7 @@ function App() {
   return (
     <div style={{ padding: 16, maxWidth: 550, margin: '0 auto', fontFamily: 'system-ui', background: '#f0f2f5', minHeight: '100vh' }}>
       <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: 20, borderRadius: 16, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: 22, margin: 0, color: '#fff' }}>🍽️ Питание СПБ</h1>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Личный кабинет</div>
-        </div>
+        <div><h1 style={{ fontSize: 22, margin: 0, color: '#fff' }}>🍽️ Питание СПБ</h1><div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Личный кабинет</div></div>
         <button onClick={() => { setCurrentClient(null); navigate('login') }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', padding: '10px 16px', borderRadius: 8, color: '#fff', cursor: 'pointer' }}>Выход</button>
       </div>
 
@@ -1230,7 +1203,6 @@ function App() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <span style={{ background: currentClient.clientType === 'contract' ? '#43e97b' : '#4facfe', color: '#fff', padding: '6px 12px', borderRadius: 20, fontSize: 12 }}>{CLIENT_TYPES[currentClient.clientType]?.name}</span>
-            {currentClient.discount > 0 && <div style={{ marginTop: 6, background: '#f5576c', color: '#fff', padding: '4px 10px', borderRadius: 12, fontSize: 12 }}>-{currentClient.discount}%</div>}
           </div>
         </div>
       </div>
@@ -1242,31 +1214,24 @@ function App() {
       </div>
 
       {tab === 'dashboard' && (
-        <>
-          <div style={{ background: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ padding: 16, background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 12, textAlign: 'center', color: '#fff' }}>
-                <div style={{ fontSize: 28, fontWeight: 'bold' }}>{orders.filter(o => o.clientId === currentClient.id && o.status === 'created').length}</div>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>ожидают</div>
-              </div>
-              <div style={{ padding: 16, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', borderRadius: 12, textAlign: 'center', color: '#fff' }}>
-                <div style={{ fontSize: 28, fontWeight: 'bold' }}>{orders.filter(o => o.clientId === currentClient.id && o.status !== 'cancelled').reduce((s, o) => s + o.total, 0).toLocaleString()}₽</div>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>всего заказов</div>
-              </div>
+        <div style={{ background: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: 16, background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 12, textAlign: 'center', color: '#fff' }}>
+              <div style={{ fontSize: 28, fontWeight: 'bold' }}>{orders.filter(o => o.clientId === currentClient.id && o.status === 'created').length}</div>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>ожидают</div>
+            </div>
+            <div style={{ padding: 16, background: 'linear-gradient(135deg, #43e97b, #38f9d7)', borderRadius: 12, textAlign: 'center', color: '#fff' }}>
+              <div style={{ fontSize: 28, fontWeight: 'bold' }}>{orders.filter(o => o.clientId === currentClient.id && o.status !== 'cancelled').reduce((s, o) => s + o.total, 0).toLocaleString()}₽</div>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>всего заказов</div>
             </div>
           </div>
-          <div style={{ background: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 }}>
-            <h3 style={{ marginTop: 0, fontSize: 15 }}>📞 Менеджер</h3>
-            {(() => { const mgr = getManager(currentClient.managerId); return <div>{mgr?.name || 'Не назначен'} • {mgr?.phone || '-'}</div> })()}
-          </div>
-        </>
+        </div>
       )}
-
 
       {tab === 'menu' && (
         <div style={{ background: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 }}>
           <h3 style={{ marginTop: 0, marginBottom: 14 }}>🍽️ Выберите меню</h3>
-          {menus.filter(m => m.approved).map(menu => (
+          {menus.filter(m => m.approved && m.managerIds?.includes(currentClient.managerId) && m.productionIds?.includes(currentClient.productionId)).map(menu => (
             <button key={menu.id} onClick={() => setSelectedMenuId(menu.id)} style={{ width: '100%', padding: '14px', marginBottom: 10, border: selectedMenuId === menu.id ? '2px solid #667eea' : '2px solid #e0e0e0', borderRadius: 12, background: selectedMenuId === menu.id ? '#E8F5E9' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
               <b>{menu.name}</b>
               <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
@@ -1310,13 +1275,8 @@ function App() {
               <div style={{ fontSize: 13, color: '#666' }}>{order.menuName} • {order.total.toLocaleString()}₽</div>
               <div style={{ fontSize: 12, color: ORDER_STATUS[order.status]?.color }}>{ORDER_STATUS[order.status]?.label}</div>
               
-              {order.status === 'created' && (
-                <button onClick={() => cancelOrder(order.id)} style={{ marginTop: 8, padding: '8px', background: '#f5576c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>❌ Отменить</button>
-              )}
-              
-              {order.status === 'delivery' && (
-                <button onClick={() => confirmDelivery(order.id)} style={{ marginTop: 8, padding: '8px', background: '#43e97b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>✅ Подтвердить получение</button>
-              )}
+              {order.status === 'created' && <button onClick={() => cancelOrder(order.id)} style={{ marginTop: 8, padding: '8px', background: '#f5576c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>❌ Отменить</button>}
+              {order.status === 'delivery' && <button onClick={() => confirmDelivery(order.id)} style={{ marginTop: 8, padding: '8px', background: '#43e97b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>✅ Подтвердить получение</button>}
             </div>
           ))}
         </div>
