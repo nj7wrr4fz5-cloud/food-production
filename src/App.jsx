@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const CLIENT_TYPES = {
   contract: { id: 'contract', name: 'По договору' },
@@ -71,6 +71,13 @@ const buttonSuccessStyle = { background: '#43e97b', color: '#fff', border: 'none
 const loadFromStorage = (key) => { try { const data = localStorage.getItem('food_' + key); return data ? JSON.parse(data) : null } catch (e) { return null } }
 const saveToStorage = (key, data) => { try { localStorage.setItem('food_' + key, JSON.stringify(data)); return true } catch (e) { return false } }
 
+const clearAllCache = () => {
+  if (confirm('Очистить весь кэш приложения? Все данные будут сброшены к начальным значениям.')) {
+    localStorage.clear()
+    window.location.reload()
+  }
+}
+
 function App() {
   const [view, setView] = useState('login')
   const [tab, setTab] = useState('dashboard')
@@ -107,6 +114,8 @@ function App() {
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [requestForm, setRequestForm] = useState({ name: '', phone: '', company: '', people: '', message: '' })
   const [reportPeriod, setReportPeriod] = useState('thisMonth')
+  const [uploadedMenu, setUploadedMenu] = useState(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     const loadData = () => {
@@ -255,11 +264,13 @@ function App() {
     setOrders(prev => [newOrder, ...prev])
     addLog('Создан заказ', `${currentClient.company} - ${newOrder.orderNumber}`)
     alert(`Заказ ${newOrder.orderNumber} отправлен!`)
+    setTab('orders')
   }
 
   const cancelOrder = async (orderId) => {
     if (!confirm('Отменить заказ?')) return
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o))
+    addLog('Отмена заказа', `Заказ ID: ${orderId}`)
   }
 
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -489,6 +500,50 @@ function App() {
     link.click()
   }
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result
+        const lines = text.split('\n')
+        const headers = lines[0].split(',')
+        
+        const menuData = {
+          id: Date.now(),
+          name: file.name.replace('.csv', '') || 'Загруженное меню',
+          rations: {},
+          active: true,
+          approved: false,
+          managerIds: [],
+          productionIds: [],
+          singlePrice: 0,
+          uploaded: true
+        }
+        
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',')
+          if (values.length >= 2) {
+            const rationName = values[0].toLowerCase()
+            const price = parseInt(values[1]) || 0
+            if (RATION_TYPES[rationName]) {
+              menuData.rations[rationName] = { price }
+            }
+          }
+        }
+        
+        setUploadedMenu(menuData)
+        setEditingMenu(menuData)
+        alert('Меню загружено! Теперь укажите менеджеров и производства.')
+      } catch (err) {
+        alert('Ошибка при чтении файла: ' + err.message)
+      }
+    }
+    reader.readAsText(file)
+  }
+
   const finance = getFinanceStats()
 
   if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>Загрузка...</div>
@@ -553,7 +608,8 @@ function App() {
       { id: 'menu', name: 'Меню' },
       { id: 'reports', name: 'Отчеты' },
       { id: 'managers', name: 'Менеджеры' },
-      { id: 'telegram', name: 'Telegram' }
+      { id: 'telegram', name: 'Telegram' },
+      { id: 'cache', name: 'Кэш' }
     ]
 
     const filteredOrders = orders.filter(o => {
@@ -761,7 +817,6 @@ function App() {
             </div>
           )}
 
-
           {tab === 'clients' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -813,17 +868,22 @@ function App() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ margin: 0 }}>Меню</h2>
-                <button onClick={() => setEditingMenu({ id: null, name: 'Новое меню', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: false, managerIds: [], productionIds: [], singlePrice: 0 })} style={buttonPrimaryStyle}>+ Добавить меню</button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
+                  <button onClick={() => fileInputRef.current?.click()} style={buttonSecondaryStyle}>Загрузить CSV</button>
+                  <button onClick={() => setEditingMenu({ id: null, name: 'Новое меню', rations: { breakfast: {price: 280}, lunch: {price: 420}, dinner: {price: 380}, night: {price: 450}, snack: {price: 180} }, active: true, approved: false, managerIds: [], productionIds: [], singlePrice: 0 })} style={buttonPrimaryStyle}>+ Добавить меню</button>
+                </div>
               </div>
               
               {menus.length === 0 ? (
-                <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Нет меню. Нажмите "+ Добавить меню"</div>
+                <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>Нет меню. Нажмите "+ Добавить меню" или загрузите CSV</div>
               ) : (
                 menus.map(menu => (
                   <div key={menu.id} style={{ ...sectionStyle, borderLeft: menu.approved ? '4px solid #43e97b' : '4px solid #f5576c', borderRadius: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                       <div>
                         <h3 style={{ margin: 0, fontSize: 18 }}>{menu.name}</h3>
+                        {menu.uploaded && <span style={{ background: '#ff9800', color: '#fff', padding: '2px 8px', borderRadius: 4, fontSize: 11 }}>ЗАГРУЖЕНО</span>}
                         {menu.singlePrice > 0 && <div style={{ fontSize: 12, color: '#43e97b' }}>Единая цена: {menu.singlePrice}₽ за порцию</div>}
                         <div style={{ fontSize: 12, color: '#667eea' }}>Менеджеры: {menu.managerIds?.map(id => getManager(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
                         <div style={{ fontSize: 12, color: '#f5576c' }}>Производства: {menu.productionIds?.map(id => getProduction(id)?.name).filter(Boolean).join(', ') || 'Все'}</div>
@@ -952,6 +1012,17 @@ function App() {
             </div>
           )}
 
+          {tab === 'cache' && (
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: 20 }}>Кэш приложения</h2>
+              
+              <div style={sectionStyle}>
+                <h3 style={{ marginTop: 0, color: '#f44336' }}>Опасная зона</h3>
+                <p style={{ marginBottom: 20 }}>Очистка кэша сбросит все данные к начальным значениям. Используйте только при серьезных проблемах.</p>
+                <button onClick={clearAllCache} style={{ ...buttonDangerStyle, padding: '16px 32px', fontSize: 16, borderRadius: 10 }}>Очистить весь кэш</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* МОДАЛКИ */}
@@ -996,7 +1067,7 @@ function App() {
                 ))}
               </div>
               
-              <h4 style={{ marginTop: 20 }}>Менеджеры:</h4>
+              <h4 style={{ marginTop: 20 }}>Менеджеры (кто может работать с этим меню):</h4>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {managers.map(mgr => (
                   <label key={mgr.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: editingMenu.managerIds?.includes(mgr.id) ? '#667eea' : '#f5f5f5', color: editingMenu.managerIds?.includes(mgr.id) ? '#fff' : '#333', borderRadius: 8, cursor: 'pointer' }}>
@@ -1024,7 +1095,7 @@ function App() {
               
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                 <button onClick={handleSaveMenu} style={{ flex: 1, padding: 14, background: '#43e97b', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Сохранить</button>
-                <button onClick={() => setEditingMenu(null)} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
+                <button onClick={() => { setEditingMenu(null); setUploadedMenu(null) }} style={{ flex: 1, padding: 14, background: '#f5576c', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer' }}>Отмена</button>
               </div>
             </div>
           </div>
@@ -1084,7 +1155,8 @@ function App() {
                 <div><label style={labelStyle}>Тип:</label><select value={editingProduction.type} onChange={(e) => setEditingProduction({...editingProduction, type: e.target.value})} style={inputStyle}><option value="own">Свое</option><option value="partner">Партнер</option></select></div>
                 <div><label style={labelStyle}>Адрес:</label><input type="text" value={editingProduction.address} onChange={(e) => setEditingProduction({...editingProduction, address: e.target.value})} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Контакт:</label><input type="text" value={editingProduction.contact} onChange={(e) => setEditingProduction({...editingProduction, contact: e.target.value})} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Доставка:</label><input type="checkbox" checked={editingProduction.delivery} onChange={(e) => setEditingProduction({...editingProduction, delivery: e.target.checked})} /><span>{editingProduction.delivery ? ` Цена: ${editingProduction.deliveryPrice}₽` : ''}</span></div>
+                <div><label style={labelStyle}>Доставка:</label><input type="checkbox" checked={editingProduction.delivery} onChange={(e) => setEditingProduction({...editingProduction, delivery: e.target.checked})} /><span> {editingProduction.delivery ? `Цена доставки: ${editingProduction.deliveryPrice}₽` : ''}</span></div>
+                {editingProduction.delivery && <div><label style={labelStyle}>Цена доставки:</label><input type="number" value={editingProduction.deliveryPrice || 0} onChange={(e) => setEditingProduction({...editingProduction, deliveryPrice: parseInt(e.target.value) || 0})} style={inputStyle} /></div>}
               </div>
               <h4 style={{ marginTop: 20 }}>Стоимость рационов:</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
@@ -1156,7 +1228,6 @@ function App() {
             <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '10px 18px', border: 'none', borderRadius: 10, background: tab === t.id ? '#43e97b' : 'transparent', color: tab === t.id ? '#fff' : '#555', cursor: 'pointer', fontSize: 14, fontWeight: '500', marginRight: 6 }}>{t.name}</button>
           ))}
         </div>
-
 
         <div style={{ padding: 24 }}>
           {tab === 'dashboard' && (
@@ -1269,7 +1340,6 @@ function App() {
               ))}
             </div>
           )}
-
           {tab === 'history' && (
             <div>
               <h2 style={{ marginTop: 0 }}>История заказов ({myHistoryOrders.length})</h2>
@@ -1369,7 +1439,6 @@ function App() {
               </div>
             </div>
           )}
-
 
           {tab === 'orders' && (
             <div>
@@ -1501,6 +1570,11 @@ function App() {
               </div>
               
               <div style={sectionStyle}>
+                <h3 style={{ marginTop: 0 }}>Загрузить заполненный шаблон:</h3>
+                <input type="file" accept=".csv" onChange={handleFileUpload} style={inputStyle} />
+              </div>
+              
+              <div style={sectionStyle}>
                 <h3 style={{ marginTop: 0 }}>Инструкция:</h3>
                 <ol style={{ paddingLeft: 20, lineHeight: 1.8 }}>
                   <li>Скачайте шаблон</li>
@@ -1530,6 +1604,8 @@ function App() {
     { id: 'orders', name: 'Заказы' },
     { id: 'history', name: 'История' }
   ]
+
+  const availableMenus = menus.filter(m => m.approved && m.managerIds?.includes(currentClient.managerId) && m.productionIds?.includes(currentClient.productionId))
 
   return (
     <div style={{ padding: 16, maxWidth: 550, margin: '0 auto', fontFamily: 'system-ui', background: '#f0f2f5', minHeight: '100vh' }}>
@@ -1579,14 +1655,18 @@ function App() {
       {tab === 'menu' && (
         <div style={{ background: '#fff', padding: 20, borderRadius: 16, marginBottom: 12 }}>
           <h3 style={{ marginTop: 0, marginBottom: 14 }}>Выберите меню</h3>
-          {menus.filter(m => m.approved && m.managerIds?.includes(currentClient.managerId) && m.productionIds?.includes(currentClient.productionId)).map(menu => (
-            <button key={menu.id} onClick={() => setSelectedMenuId(menu.id)} style={{ width: '100%', padding: '14px', marginBottom: 10, border: selectedMenuId === menu.id ? '2px solid #667eea' : '2px solid #e0e0e0', borderRadius: 12, background: selectedMenuId === menu.id ? '#E8F5E9' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
-              <b>{menu.name}</b>
-              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                {menu.singlePrice > 0 ? `Единая цена: ${menu.singlePrice}₽` : Object.entries(RATION_TYPES).map(([k, r]) => `${r.name}: ${menu.rations?.[k]?.price || 0}₽`).join(' | ')}
-              </div>
-            </button>
-          ))}
+          {availableMenus.length === 0 ? (
+            <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>Нет доступных меню</div>
+          ) : (
+            availableMenus.map(menu => (
+              <button key={menu.id} onClick={() => setSelectedMenuId(menu.id)} style={{ width: '100%', padding: '14px', marginBottom: 10, border: selectedMenuId === menu.id ? '2px solid #667eea' : '2px solid #e0e0e0', borderRadius: 12, background: selectedMenuId === menu.id ? '#E8F5E9' : '#fff', cursor: 'pointer', textAlign: 'left' }}>
+                <b>{menu.name}</b>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                  {menu.singlePrice > 0 ? `Единая цена: ${menu.singlePrice}₽` : Object.entries(RATION_TYPES).map(([k, r]) => `${r.name}: ${menu.rations?.[k]?.price || 0}₽`).join(' | ')}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       )}
 
@@ -1624,6 +1704,7 @@ function App() {
                   <div style={{ fontSize: 13, color: '#666' }}>{order.menuName} | {order.total.toLocaleString()}₽</div>
                   <div style={{ fontSize: 12, color: ORDER_STATUS[order.status]?.color }}>{ORDER_STATUS[order.status]?.label}</div>
                   
+                  {order.status === 'created' && <button onClick={() => cancelOrder(order.id)} style={{ marginTop: 8, padding: '8px', background: '#f5576c', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>Отменить</button>}
                   {order.status === 'delivery' && <button onClick={() => confirmDelivery(order.id)} style={{ marginTop: 8, padding: '8px', background: '#43e97b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', width: '100%' }}>Подтвердить получение</button>}
                 </div>
               ))}
